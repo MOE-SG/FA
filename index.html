@@ -1,0 +1,1303 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PCBA FA Workflow</title>
+<style>
+:root{
+  --ink:#13213b; --ink2:#3d4a63; --mute:#6b7487; --line:#d9dee7; --line2:#e9ecf1;
+  --bg:#f2f4f7; --card:#ffffff; --accent:#1f5fbf; --accent-bg:#e9f0fb;
+  --ok:#1e7b4f; --ok-bg:#e8f5ee; --warn:#a76400; --warn-bg:#fff5e2;
+  --bad:#b3261e; --bad-bg:#fdecea; --gate:#b3261e;
+  --mono:"Cascadia Mono",Consolas,ui-monospace,Menlo,monospace;
+  --sans:"Segoe UI",system-ui,-apple-system,Roboto,"Helvetica Neue",Arial,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{font:14px/1.45 var(--sans);color:var(--ink);background:var(--bg)}
+button,input,select,textarea{font:inherit;color:inherit}
+[hidden]{display:none!important}
+
+/* ---------- top bar ---------- */
+.top{position:sticky;top:0;z-index:20;background:var(--ink);color:#fff;display:flex;align-items:center;gap:12px;padding:8px 16px;min-height:56px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:10px;font-weight:700;letter-spacing:.02em;white-space:nowrap}
+.brand .mark{width:30px;height:30px;border:2px solid #fff;border-radius:4px;display:grid;place-items:center;font:700 11px var(--mono)}
+.brand small{display:block;font-weight:400;font-size:11px;opacity:.7;letter-spacing:.04em}
+.caseid{font:12px var(--mono);background:rgba(255,255,255,.1);padding:4px 8px;border-radius:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:320px}
+.dirty{font-size:12px;padding:3px 8px;border-radius:10px;background:#f0b429;color:#2b1d00;font-weight:600}
+.clean{font-size:12px;opacity:.7}
+.spacer{flex:1}
+.tbtn{background:transparent;border:1px solid rgba(255,255,255,.35);color:#fff;padding:6px 11px;border-radius:5px;cursor:pointer;white-space:nowrap}
+.tbtn:hover{background:rgba(255,255,255,.12)}
+.tbtn.primary{background:#fff;color:var(--ink);border-color:#fff;font-weight:600}
+.tbtn.primary:hover{background:#e7ecf5}
+.who{display:flex;align-items:center;gap:8px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.25);padding:4px 10px 4px 4px;border-radius:20px;cursor:pointer;color:#fff}
+.who .av{width:26px;height:26px;border-radius:50%;background:#fff;color:var(--ink);display:grid;place-items:center;font:700 10px var(--mono)}
+.who b{font-weight:600}
+
+.tabs{display:flex;gap:2px;padding:0 16px;background:#fff;border-bottom:1px solid var(--line);position:sticky;top:56px;z-index:15;overflow-x:auto}
+.tab{border:0;background:none;padding:11px 14px;cursor:pointer;color:var(--mute);border-bottom:2px solid transparent;font-weight:600;white-space:nowrap}
+.tab.on{color:var(--ink);border-bottom-color:var(--accent)}
+
+/* ---------- workflow view ---------- */
+.work{display:grid;grid-template-columns:300px minmax(0,1fr);gap:16px;padding:16px;max-width:1400px;margin:0 auto}
+.rail{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:8px;align-self:start;position:sticky;top:112px;max-height:calc(100vh - 128px);overflow:auto}
+.rail h4{margin:6px 8px 8px;font-size:11px;letter-spacing:.08em;color:var(--mute);text-transform:uppercase}
+.ri{display:grid;grid-template-columns:18px 1fr;gap:8px;align-items:start;padding:7px 8px;border-radius:6px;cursor:pointer;border:1px solid transparent}
+.ri:hover{background:var(--bg)}
+.ri.sel{background:var(--accent-bg);border-color:#bcd0f1}
+.ri .dot{width:14px;height:14px;border-radius:50%;margin-top:3px;border:2px solid var(--line);background:#fff}
+.ri .k{font:600 10.5px var(--mono);color:var(--mute);letter-spacing:.04em}
+.ri .t{font-weight:600;line-height:1.25}
+.ri .o{font-size:11.5px;color:var(--mute)}
+.ri.gate .k{color:var(--gate)}
+.ri.st-complete .dot{background:var(--ok);border-color:var(--ok)}
+.ri.st-active .dot{border-color:var(--accent);box-shadow:0 0 0 3px #cfe0fa}
+.ri.st-pending .dot{background:#f0b429;border-color:var(--warn)}
+.ri.st-rejected .dot{background:var(--bad);border-color:var(--bad)}
+.ri.st-na .dot{border-style:dashed}
+.ri.st-na .t,.ri.st-locked .t{color:var(--mute)}
+.ri.st-na .t{text-decoration:line-through}
+
+.banner{border-radius:8px;padding:12px 14px;margin-bottom:12px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;border:1px solid}
+.banner.you{background:var(--accent-bg);border-color:#bcd0f1}
+.banner.wait{background:#fff;border-color:var(--line)}
+.banner.done{background:var(--ok-bg);border-color:#b7dcc7}
+.banner .msg{flex:1;min-width:220px}
+.banner .msg b{display:block}
+.banner .msg span{color:var(--ink2);font-size:13px}
+
+.card{background:var(--card);border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.card + .card{margin-top:12px}
+.shead{padding:14px 18px;border-bottom:1px solid var(--line2);display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap}
+.shead .num{font:700 12px var(--mono);color:#fff;background:var(--ink);padding:5px 8px;border-radius:4px;white-space:nowrap}
+.shead.gate .num{background:var(--gate)}
+.shead h2{margin:0;font-size:19px;line-height:1.2}
+.shead .meta{font-size:12.5px;color:var(--mute);margin-top:3px}
+.holdband{background:var(--bad-bg);color:var(--bad);font:700 11px var(--mono);letter-spacing:.08em;padding:6px 18px;border-bottom:1px solid #f3c9c5}
+.pill{display:inline-block;font:600 11px var(--sans);padding:3px 9px;border-radius:10px;letter-spacing:.02em;white-space:nowrap}
+.pill.complete{background:var(--ok-bg);color:var(--ok)}
+.pill.active{background:var(--accent-bg);color:var(--accent)}
+.pill.pending{background:var(--warn-bg);color:var(--warn)}
+.pill.rejected{background:var(--bad-bg);color:var(--bad)}
+.pill.locked,.pill.na{background:var(--line2);color:var(--mute)}
+.chip{display:inline-block;font-size:11.5px;border:1px solid var(--line);border-radius:10px;padding:1px 8px;margin:2px 4px 0 0;color:var(--ink2);background:#fff}
+.chip.me{border-color:var(--accent);color:var(--accent);font-weight:600}
+.guide{padding:12px 18px;background:#fafbfc;border-bottom:1px solid var(--line2);color:var(--ink2);font-size:13.5px}
+.guide b{color:var(--ink)}
+.sbody{padding:16px 18px}
+.sec{font:700 11px var(--sans);letter-spacing:.08em;text-transform:uppercase;color:var(--mute);margin:18px 0 8px;display:flex;align-items:center;gap:8px}
+.sec:first-child{margin-top:0}
+.sec:after{content:"";flex:1;height:1px;background:var(--line2)}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 16px}
+.fld{display:flex;flex-direction:column;gap:4px;min-width:0}
+.fld.span2{grid-column:1/-1}
+.fld>label,.fld>.lab{font-size:12.5px;font-weight:600;color:var(--ink2)}
+.req{color:var(--bad)}
+.inp,textarea.inp,select.inp{border:1px solid #c9d0db;border-radius:5px;padding:7px 9px;background:#fff;width:100%}
+textarea.inp{min-height:68px;resize:vertical}
+.inp:focus{outline:2px solid #9dbcf0;outline-offset:0;border-color:var(--accent)}
+.inp:disabled{background:#f6f7f9;color:var(--ink);border-color:var(--line2)}
+.inp.miss{border-color:var(--bad);background:#fffafa}
+.opts{display:flex;flex-wrap:wrap;gap:6px}
+.opt{display:flex;align-items:center;gap:6px;border:1px solid #c9d0db;border-radius:5px;padding:5px 10px;cursor:pointer;background:#fff;font-size:13px}
+.opt input{margin:0}
+.opt.on{border-color:var(--accent);background:var(--accent-bg)}
+.opt.dis{cursor:default;opacity:.85}
+.confirm{display:flex;gap:8px;align-items:flex-start;border:1px solid #c9d0db;border-radius:5px;padding:8px 10px;background:#fff;cursor:pointer}
+.confirm.on{border-color:var(--ok);background:var(--ok-bg)}
+.confirm input{margin-top:3px}
+.ftbl{width:100%;border-collapse:collapse;font-size:13px}
+.ftbl th{background:#f5f7fa;text-align:left;font-size:11.5px;color:var(--ink2);padding:6px;border:1px solid var(--line2)}
+.ftbl td{border:1px solid var(--line2);padding:3px;vertical-align:top}
+.ftbl td .inp{border-color:transparent;padding:5px 6px;border-radius:3px}
+.ftbl td .inp:hover:not(:disabled){border-color:#c9d0db}
+.ftbl td textarea.inp{min-height:34px}
+.tblwrap{overflow-x:auto}
+.xbtn{border:0;background:none;color:var(--mute);cursor:pointer;padding:4px 6px;font-size:16px;line-height:1}
+.xbtn:hover{color:var(--bad)}
+.btn{border:1px solid #c0c8d4;background:#fff;padding:7px 13px;border-radius:5px;cursor:pointer;font-weight:600;color:var(--ink)}
+.btn:hover{background:#f3f5f8}
+.btn.sm{padding:4px 10px;font-size:12.5px}
+.btn.pri{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.pri:hover{background:#174e9e}
+.btn.ok{background:var(--ok);border-color:var(--ok);color:#fff}
+.btn.bad{background:#fff;border-color:var(--bad);color:var(--bad)}
+.btn.warn{background:var(--warn);border-color:var(--warn);color:#fff}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+
+.chk{display:grid;grid-template-columns:34px 1fr auto;gap:10px;align-items:start;padding:9px 10px;border:1px solid var(--line2);border-radius:6px;margin-bottom:6px;background:#fff}
+.chk .no{font:700 12px var(--mono);color:var(--mute);padding-top:2px}
+.chk .tx b{display:block;font-weight:600}
+.chk .tx span{font-size:12.5px;color:var(--mute)}
+.chk .ctl{display:flex;gap:4px}
+.seg{border:1px solid #c0c8d4;background:#fff;padding:4px 9px;font-size:12px;font-weight:600;cursor:pointer;border-radius:4px;color:var(--ink2)}
+.seg.on.d{background:var(--ok);border-color:var(--ok);color:#fff}
+.seg.on.n{background:var(--mute);border-color:var(--mute);color:#fff}
+.seg:disabled{cursor:default}
+.autotag{font-size:11.5px;color:var(--mute);font-style:italic;white-space:nowrap}
+.chk.isdone{border-color:#b7dcc7;background:#fbfefc}
+.chk.gatechk .no{color:var(--gate)}
+
+.photos{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px}
+.ph{border:1px solid var(--line);border-radius:6px;overflow:hidden;background:#fff;position:relative}
+.ph img{display:block;width:100%;height:120px;object-fit:cover;background:#eef0f3;cursor:zoom-in}
+.ph .inp{border:0;border-top:1px solid var(--line2);border-radius:0;font-size:12px}
+.ph .xbtn{position:absolute;top:4px;right:4px;background:rgba(255,255,255,.9);border-radius:4px}
+.ph .by{font-size:10.5px;color:var(--mute);padding:2px 8px 4px}
+.addph{border:1.5px dashed #b6bfcc;border-radius:6px;display:grid;place-items:center;min-height:150px;color:var(--mute);cursor:pointer;background:#fafbfc;text-align:center;font-size:13px;padding:8px}
+.addph:hover{border-color:var(--accent);color:var(--accent)}
+
+.foot{padding:14px 18px;border-top:1px solid var(--line2);background:#fafbfc;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.foot .note{flex:1;min-width:200px;font-size:12.5px;color:var(--mute)}
+.sig{font-size:12.5px;color:var(--ink2)}
+.sig b{color:var(--ink)}
+.appr{width:100%;border-collapse:collapse;font-size:13px;margin-top:4px}
+.appr th,.appr td{border:1px solid var(--line2);padding:7px 9px;text-align:left}
+.appr th{background:#f5f7fa;font-size:11.5px;color:var(--ink2)}
+.warnbox{border:1px solid #f3c9c5;background:var(--bad-bg);color:var(--bad);border-radius:6px;padding:9px 12px;font-size:13px;margin-bottom:12px}
+.infobox{border:1px solid #bcd0f1;background:var(--accent-bg);color:#123c7a;border-radius:6px;padding:9px 12px;font-size:13px;margin-bottom:12px}
+.loopbox{border:1px solid #f1d39b;background:var(--warn-bg);color:#5a3800;border-radius:6px;padding:9px 12px;font-size:13px;margin-bottom:12px}
+
+/* ---------- other views ---------- */
+.pane{max-width:1100px;margin:0 auto;padding:16px}
+.flowwrap{display:grid;grid-template-columns:minmax(0,1fr) 260px;gap:16px;align-items:start}
+.flowcard{background:#fff;border:1px solid var(--line);border-radius:8px;padding:12px;display:flex;justify-content:center}
+.flowcard svg{width:100%;max-width:680px;height:auto}
+.flowcard [data-go]{cursor:pointer}
+.flowcard [data-go]:hover>*:first-child{filter:brightness(.97);stroke-width:2.5}
+.legend{background:#fff;border:1px solid var(--line);border-radius:8px;padding:14px;position:sticky;top:112px;font-size:13px}
+.legend h4{margin:0 0 8px;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--mute)}
+.lg{display:flex;align-items:center;gap:8px;margin:5px 0}
+.lg i{width:22px;height:14px;border-radius:3px;border:2px solid;display:inline-block;flex:none}
+.dtbl{width:100%;border-collapse:collapse;background:#fff;font-size:13px}
+.dtbl th,.dtbl td{border:1px solid var(--line);padding:7px 9px;text-align:left;vertical-align:top}
+.dtbl th{background:#f5f7fa;font-size:11.5px;letter-spacing:.03em;color:var(--ink2)}
+.dtbl td.c{text-align:center}
+.dtbl a{color:var(--accent);cursor:pointer;text-decoration:none;font-weight:600}
+h3.h{margin:20px 0 8px;font-size:16px}
+h3.h:first-child{margin-top:0}
+
+/* ---------- dialogs ---------- */
+dialog{border:0;border-radius:10px;padding:0;max-width:min(560px,94vw);width:100%;box-shadow:0 20px 60px rgba(10,20,40,.35)}
+dialog::backdrop{background:rgba(15,25,45,.5)}
+.dlg h3{margin:0;padding:16px 20px;border-bottom:1px solid var(--line2);font-size:17px}
+.dlg .db{padding:16px 20px;display:flex;flex-direction:column;gap:12px}
+.dlg .df{padding:12px 20px;border-top:1px solid var(--line2);display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;background:#fafbfc}
+.roles{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.rolec{border:1.5px solid var(--line);border-radius:7px;padding:10px;cursor:pointer;text-align:left;background:#fff}
+.rolec b{display:block}
+.rolec span{font-size:12px;color:var(--mute)}
+.rolec.on{border-color:var(--accent);background:var(--accent-bg)}
+.small{font-size:12.5px;color:var(--mute)}
+.fname{font:12.5px var(--mono);background:var(--bg);padding:6px 9px;border-radius:5px;word-break:break-all}
+#toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 16px;border-radius:7px;font-size:13.5px;opacity:0;pointer-events:none;transition:opacity .2s;z-index:100;max-width:90vw}
+#toast.show{opacity:1}
+.dropov{position:fixed;inset:0;background:rgba(31,95,191,.12);border:3px dashed var(--accent);z-index:90;display:grid;place-items:center;font-size:20px;font-weight:700;color:var(--accent);pointer-events:none}
+#lightbox{max-width:94vw;background:#111}
+#lightbox img{display:block;max-width:92vw;max-height:86vh}
+
+@media (max-width:900px){
+  .work{grid-template-columns:1fr}
+  .rail{position:static;max-height:none}
+  .flowwrap{grid-template-columns:1fr}
+  .legend{position:static}
+  .grid{grid-template-columns:1fr}
+  .roles{grid-template-columns:1fr}
+  .caseid{max-width:160px}
+  .tabs{top:0;position:relative}
+}
+
+/* ---------- print ---------- */
+#print-root{display:none}
+@media print{
+  @page{size:A4;margin:12mm 11mm 12mm 11mm}
+  body{background:#fff;font-size:10pt}
+  .top,.tabs,main,dialog,#toast{display:none!important}
+  #print-root{display:block}
+}
+.pr{font:9.5pt/1.35 var(--sans);color:#000}
+.pr .wrap{width:100%;border-collapse:collapse}
+.pr .wrap>thead td,.pr .wrap>tfoot td{padding:0}
+.pr .ph-h{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2px solid #000;padding-bottom:3px;margin-bottom:6mm;font-size:8pt}
+.pr .ph-h b{font-size:9.5pt}
+.pr .ph-f{border-top:1px solid #000;margin-top:5mm;padding-top:2px;font-size:7.5pt;display:flex;justify-content:space-between;color:#333}
+.pr h1{font-size:17pt;margin:0 0 2mm}
+.pr h2{font-size:12pt;margin:0;padding:2mm 3mm;background:#13213b;color:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.pr h2.g{background:#b3261e}
+.pr h3{font-size:10.5pt;margin:4mm 0 2mm}
+.pr .sect{margin-top:6mm}
+.pr .pb{break-before:page}
+.pr table.t{width:100%;border-collapse:collapse;margin-top:2mm}
+.pr table.t th,.pr table.t td{border:.6pt solid #555;padding:1.5mm 2mm;text-align:left;vertical-align:top}
+.pr table.t th{background:#e9ecf1;font-size:8.5pt;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.pr table.t td.l{width:34%;font-weight:600;background:#f7f8fa;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.pr table.t tr{break-inside:avoid}
+.pr .blank{display:inline-block;min-width:60%;border-bottom:.6pt solid #888;height:1.1em}
+.pr .blankbox{height:12mm}
+.pr .guide{font-size:8.5pt;color:#333;padding:2mm 3mm;border:.6pt solid #555;border-top:0}
+.pr .meta{font-size:8.5pt;color:#333;margin:1.5mm 0}
+.pr .phg{display:grid;grid-template-columns:repeat(3,1fr);gap:3mm;margin-top:2mm}
+.pr .phg figure{margin:0;break-inside:avoid;border:.6pt solid #888}
+.pr .phg img{width:100%;height:42mm;object-fit:contain;display:block;background:#f2f2f2}
+.pr .phg figcaption{font-size:7.5pt;padding:1mm 1.5mm}
+.pr .flowp svg{height:232mm;width:auto;display:block;margin:0 auto}
+.pr .stamp{display:inline-block;border:1.2pt solid;padding:.5mm 2mm;font-weight:700;font-size:8pt}
+.pr .ok{color:#1e7b4f}.pr .bad{color:#b3261e}.pr .warn{color:#a76400}
+.pr .note{font-size:8pt;border:.6pt solid #555;padding:2mm;margin-top:4mm}
+.pr .psec{break-inside:avoid}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="brand"><div class="mark">FA</div><div>PCBA Failure Analysis<small>Controlled workflow · file hand-off</small></div></div>
+  <span class="caseid" id="caseLabel">New case</span>
+  <span id="dirtyFlag" class="clean">No changes</span>
+  <div class="spacer"></div>
+  <button class="tbtn" id="bNew" title="Start a new FA case">New</button>
+  <button class="tbtn" id="bOpen" title="Open a .fa.json case file">Open</button>
+  <button class="tbtn" id="bSave" title="Save case file">Save</button>
+  <button class="tbtn primary" id="bSend" title="Save and send to the next role">Send to…</button>
+  <button class="tbtn" id="bPrint" title="Print or save as PDF">Print / PDF</button>
+  <button class="who" id="bWho"><span class="av" id="whoAv">?</span><span><b id="whoName">Choose role</b> <span id="whoRole" style="opacity:.75"></span></span></button>
+</header>
+
+<nav class="tabs" id="tabs">
+  <button class="tab on" data-view="work">Workflow</button>
+  <button class="tab" data-view="flow">Flowchart</button>
+  <button class="tab" data-view="check">Checklist &amp; evidence</button>
+  <button class="tab" data-view="log">History</button>
+</nav>
+
+<main>
+  <section id="view-work" class="work">
+    <aside class="rail" id="rail"></aside>
+    <div><div id="banner"></div><div id="stage"></div></div>
+  </section>
+  <section id="view-flow" class="pane" hidden>
+    <div class="flowwrap">
+      <div class="flowcard" id="flowHost"></div>
+      <div class="legend">
+        <h4>Status</h4>
+        <div class="lg"><i style="border-color:#1f5fbf;background:#fff"></i>Current step</div>
+        <div class="lg"><i style="border-color:#1e7b4f;background:#e8f5ee"></i>Completed / signed</div>
+        <div class="lg"><i style="border-color:#a76400;background:#fff5e2"></i>Awaiting approval</div>
+        <div class="lg"><i style="border-color:#b3261e;background:#fdecea"></i>Rejected — revise</div>
+        <div class="lg"><i style="border-color:#c5cad3;background:#f5f6f8"></i>Not started</div>
+        <div class="lg"><i style="border-color:#c5cad3;border-style:dashed;background:#fff"></i>Not applicable (bypassed)</div>
+        <h4 style="margin-top:14px">Shapes</h4>
+        <div class="lg">▭ Work step (one owner signs)</div>
+        <div class="lg" style="color:#b3261e">⬡ Hold point — multi-role approval</div>
+        <div class="lg">◇ Decision recorded in the step above</div>
+        <p class="small" style="margin:12px 0 0">Click any box to open that stage. Dashed return lines are the loop-backs: a failed mechanism check returns to hypotheses; a failed verification returns to localization.</p>
+      </div>
+    </div>
+  </section>
+  <section id="view-check" class="pane" hidden></section>
+  <section id="view-log" class="pane" hidden></section>
+</main>
+
+<div id="print-root" class="pr"></div>
+<input type="file" id="fileIn" accept=".json,application/json" hidden>
+<input type="file" id="photoIn" accept="image/*" multiple hidden>
+<div id="toast"></div>
+
+<!-- role dialog -->
+<dialog id="dRole"><div class="dlg">
+  <h3>Who is working on this case?</h3>
+  <div class="db">
+    <div class="fld"><label for="whoIn">Your name <span class="req">*</span></label><input class="inp" id="whoIn" placeholder="e.g. Soe M."></div>
+    <div class="fld"><span class="lab">Your role in this FA</span><div class="roles" id="roleCards"></div></div>
+    <p class="small" style="margin:0">Your role decides which stages you can edit, sign and approve. Name and role are stamped on every signature and history entry.</p>
+  </div>
+  <div class="df"><button class="btn pri" id="roleOk">Continue</button></div>
+</div></dialog>
+
+<!-- send dialog -->
+<dialog id="dSend"><div class="dlg">
+  <h3>Send case to the next person</h3>
+  <div class="db">
+    <div class="fld"><label>Next role</label><select class="inp" id="sendRole"></select></div>
+    <div class="fld"><label>Recipient email (optional)</label><input class="inp" id="sendTo" type="email" placeholder="name@company.com"></div>
+    <div class="fld"><label>Message (optional)</label><textarea class="inp" id="sendMsg" placeholder="Anything they should know"></textarea></div>
+    <div class="fld"><span class="lab">Attachment</span><div class="fname" id="sendFile"></div></div>
+    <p class="small" style="margin:0" id="sendHint"></p>
+  </div>
+  <div class="df">
+    <button class="btn" data-close>Cancel</button>
+    <button class="btn" id="sendDl">Download only</button>
+    <button class="btn" id="sendMail">Download + email draft</button>
+    <button class="btn pri" id="sendShare" hidden>Share with attachment…</button>
+  </div>
+</div></dialog>
+
+<!-- generic prompt dialog -->
+<dialog id="dAsk"><div class="dlg">
+  <h3 id="askT"></h3>
+  <div class="db"><p id="askP" style="margin:0"></p><textarea class="inp" id="askIn"></textarea></div>
+  <div class="df"><button class="btn" data-close>Cancel</button><button class="btn pri" id="askOk">OK</button></div>
+</div></dialog>
+
+<!-- print dialog -->
+<dialog id="dPrint"><div class="dlg">
+  <h3>Print / save as PDF</h3>
+  <div class="db">
+    <label class="confirm"><input type="radio" name="pmode" value="full" checked><span><b>Current case report</b><br><span class="small">Everything recorded so far, signatures, approvals, photos and history. Works at any stage.</span></span></label>
+    <label class="confirm"><input type="radio" name="pmode" value="blank"><span><b>Blank paper form</b><br><span class="small">Empty controlled form for manual use.</span></span></label>
+    <label class="opt" style="align-self:flex-start"><input type="checkbox" id="pPhotos" checked> Include photos</label>
+    <p class="small" style="margin:0">In the print window choose <b>Save as PDF</b> as the destination.</p>
+  </div>
+  <div class="df"><button class="btn" data-close>Cancel</button><button class="btn pri" id="printGo">Print</button></div>
+</div></dialog>
+
+<dialog id="lightbox"><img alt=""></dialog>
+
+<script>
+"use strict";
+/* =====================================================================
+   PCBA FA Workflow — single-file app. Case data lives in a .fa.json file
+   that is passed between roles. Nothing is sent to any server.
+   ===================================================================== */
+const APP_VER = "1.0";
+const SCHEMA = "pcba-fa-case";
+
+const ROLES = {
+  FA:   {name:"FA Owner",          ab:"FA",  desc:"Owns the case: intake, hypotheses, disposition prep, closure"},
+  QA:   {name:"Quality",           ab:"QA",  desc:"Containment, inspection, gate approvals, CAPA"},
+  TEST: {name:"Test",              ab:"TST", desc:"Test plan, reproduction, verification testing"},
+  ENG:  {name:"Engineering",       ab:"ENG", desc:"Diagnostics, localization, mechanism verification"},
+  RWK:  {name:"Rework Technician", ab:"RWK", desc:"Authorized rework, substitution, destructive FA"},
+  MFG:  {name:"Manufacturing",     ab:"MFG", desc:"Disposition and release approval"},
+  VIEW: {name:"Viewer",            ab:"VW",  desc:"Read-only review and printing"}
+};
+const rn = r => ROLES[r] ? ROLES[r].name : r;
+
+/* ---------- field helpers ---------- */
+const F = (key,label,type="text",o={}) => Object.assign({key,label,type},o);
+const YESNO = [["yes","Yes"],["no","No"]];
+
+/* ---------- stage definitions (from PCBA FA flowchart template) ---------- */
+const STAGES = {
+  S1:{kind:"step", no:"Step 1", title:"Intake and identification", short:"Intake & identification", editors:["FA"],
+    guide:"Open or confirm the FDC/RQF record. Record PCBA P/N, S/N and revision; insert and tool IDs; firmware/configuration; site or district; operating hours; reported symptom; failure parameters; installation and repair history.",
+    fields:[
+      F("fdc","FDC / RQF no.","text",{req:1}), F("faOwner","FA owner","text",{req:1}),
+      F("pn","PCBA P/N","text",{req:1}), F("sn","PCBA S/N","text",{req:1}),
+      F("rev","PCBA revision","text",{req:1}), F("fw","Firmware / configuration","text",{req:1}),
+      F("insertId","Insert ID"), F("toolId","Tool ID"),
+      F("site","Site / district"), F("hours","Operating hours","text"),
+      F("received","Date received","date"), F("opened","Date FA opened","date",{req:1}),
+      F("symptom","Reported symptom","textarea",{req:1,span:2}),
+      F("params","Failure parameters","textarea",{span:2}),
+      F("history","Installation and repair history","textarea",{span:2})
+    ]},
+  S2:{kind:"step", no:"Step 2", title:"Contain and preserve", short:"Contain & preserve", editors:["QA"],
+    guide:"Quarantine the PCBA and any identified affected population. <b>Do not clean, repair, remove components or alter configuration.</b> Apply identification and chain-of-custody controls.",
+    fields:[
+      F("qLoc","Quarantine location","text",{req:1}), F("qty","Quantity quarantined","number"),
+      F("scope","Affected serial / lot scope","textarea",{req:1,span:2}),
+      F("decision","Containment decision","textarea",{req:1}), F("approver","Containment approved by","text",{req:1}),
+      F("coc","Chain-of-custody record / tag no.","text",{req:1}),
+      F("noalter","No cleaning, repair, component removal or configuration change has been performed","confirm",{req:1,span:2})
+    ]},
+  S3:{kind:"step", no:"Step 3", title:"As-received evidence", short:"As-received evidence", editors:["FA","QA","ENG"], photos:true,
+    guide:"Photograph both sides, connectors, labels and suspect areas. Record packaging condition. Inspect for shorts, missing/dislodged parts, contamination, connector damage, board bending, cracked joints, lifted pads, staking/coating damage and previous rework evidence.",
+    fields:[
+      F("pkg","Packaging condition","radio",{req:1,options:[["intact","Intact, ESD-safe"],["damaged","Damaged"],["noesd","Not ESD-protected"],["none","No packaging"]]}),
+      F("pkgNote","Packaging notes"),
+      F("photos","Photographs taken","checks",{span:2,options:["Top side","Bottom side","Connectors","Labels","Suspect areas"]}),
+      F("anom","Anomalies observed","checks",{span:2,options:["None observed","Shorts / bridges","Missing or dislodged parts","Contamination","Connector damage","Board bending / flex","Cracked joints","Lifted pads","Staking / coating damage","Previous rework evidence"]}),
+      F("findings","Inspection findings and anomaly map","textarea",{req:1,span:2}),
+      F("inspector","Inspected by","text",{req:1}), F("inspDate","Inspection date","date",{req:1})
+    ]},
+  GA:{kind:"gate", no:"Gate A", title:"Diagnostic test authorization", short:"Diagnostic test authorization", editors:["TEST"], approvers:["TEST","QA"],
+    guide:"Define the test purpose, applicable procedure and revision, expected result, acceptance limits, equipment and calibration, fixture or simulator, firmware, stop criteria, safety controls and product-integrity risks. <b>Test and Quality approval required before energizing, stressing or changing the test configuration.</b>",
+    fields:[
+      F("purpose","Scope / purpose of testing","textarea",{req:1,span:2}),
+      F("proc","Procedure / plan / revision","text",{req:1}), F("step","Procedure step / acceptance criterion ref."),
+      F("expected","Expected result","textarea"), F("limits","Acceptance limits","textarea",{req:1}),
+      F("stop","Stop criteria","textarea",{req:1,span:2}),
+      F("equip","Equipment IDs and calibration due dates","textarea",{req:1}), F("fixture","Fixture / simulator and revision","textarea"),
+      F("fwsw","Firmware / test software and version"), F("calBy","Equipment and calibration verified by","text",{req:1}),
+      F("risks","Safety controls and product-integrity risks","textarea",{req:1,span:2})
+    ]},
+  S4:{kind:"step", no:"Step 4", title:"Reproduce the reported failure", short:"Reproduce reported failure", editors:["TEST"], photos:true,
+    guide:"Start with the reported configuration and environment. Record expected versus actual result, test setup, load or simulator, firmware, temperature, soak time, duty cycle, operator, date/time and native raw test files. Then <b>classify the behavior</b> — this selects the branch.",
+    fields:[
+      F("config","Test configuration and environment","textarea",{req:1,span:2}),
+      F("load","Load or simulator"), F("fwUsed","Firmware used"),
+      F("temp","Temperature"), F("soak","Soak time"), F("duty","Duty cycle"),
+      F("operator","Operator","text",{req:1}), F("when","Date / time","datetime-local",{req:1}),
+      F("expected","Expected result","textarea"), F("actual","Actual result","textarea",{req:1}),
+      F("raw","Native raw data file location(s)","text",{req:1,span:2}),
+      F("reproduced","Failure reproduced?","radio",{req:1,span:2,options:[["yes","Yes — consistently"],["some","Sometimes"],["no","No"]]}),
+      F("cls","Behavior classification (selects branch)","radio",{req:1,span:2,options:[["R","R — Repeatable at PCBA level"],["T","T — Heat or soak dependent"],["I","I — Intermittent / handling sensitive"],["N","N — No fault found at PCBA level"]]}),
+      F("freq","Frequency of occurrence"), F("det","Detection level","select",{req:1,options:["","PCBA","Insert","Tool","Field"]})
+    ]},
+  SB:{kind:"branch", no:"Branch", title:"Failure-behavior branch", short:"Branch work", editors:["ENG","TEST"], photos:true,
+    guide:"Complete the checks for the branch selected in Step 4. All branches merge at Step 5. Capture evidence before any component substitution or rework.",
+    fields:null /* dynamic, see branchFields */},
+  S5:{kind:"step", no:"Step 5", title:"Localize the failing function", short:"Localize failing function", editors:["ENG"],
+    guide:"Narrow the evidence from system symptom to functional block, circuit, net, interconnect and suspect item. Record purpose, expected result, actual result and next decision for <b>every</b> diagnostic check.",
+    fields:[
+      F("block","Functional block","text",{req:1}), F("net","Circuit / net"),
+      F("inter","Interconnect"), F("suspect","Suspect item(s) / ref. des.","text",{req:1}),
+      F("diag","Diagnostic check log","table",{req:1,span:2,cols:[{k:"check",l:"Check"},{k:"purpose",l:"Purpose"},{k:"exp",l:"Expected"},{k:"act",l:"Actual"},{k:"next",l:"Next decision"}]}),
+      F("preEvid","Evidence captured before any substitution or rework","confirm",{req:1,span:2})
+    ]},
+  S6:{kind:"step", no:"Step 6", title:"Form and rank cause hypotheses", short:"Form & rank cause hypotheses", editors:["FA","ENG"],
+    guide:"Separate verified facts from hypotheses. Rank causes across component, solder/assembly, PCB trace/via/inner layer, connector, handling/mechanical stress, rework/coating, test fixture, measurement, firmware/configuration and environment. Then decide whether evidence-altering work is needed.",
+    fields:[
+      F("facts","Verified facts","textarea",{req:1,span:2}),
+      F("causes","Cause matrix","table",{req:1,span:2,cols:[
+        {k:"cat",l:"Category",type:"select",options:["","Component","Solder / assembly","PCB trace / via / inner layer","Connector","Handling / mechanical stress","Rework / coating","Test fixture","Measurement","Firmware / configuration","Environment","Human factors"]},
+        {k:"hyp",l:"Hypothesis"},{k:"ev",l:"Evidence for / against"},
+        {k:"rank",l:"Rank",type:"select",options:["","1 High","2 Medium","3 Low"]},
+        {k:"st",l:"Status",type:"select",options:["","Open","Supported","Refuted"]}]}),
+      F("path","Next path","radio",{req:1,span:2,options:[["action","Evidence-altering action required → Gate B (rework / substitution / destructive FA)"],["noaction","No evidence-altering action (e.g. NFF, fixture or test issue) → go to Step 10 verification"]]})
+    ]},
+  GB:{kind:"gate", no:"Gate B", title:"Rework or destructive FA authorization", short:"Rework / destructive FA authorization", editors:["FA","ENG"], approvers:["ENG","QA"],
+    guide:"Before substitution, component removal, depopulation, cross-section or destructive analysis, document the rationale, controlled method, operator, equipment, materials, evidence-preservation controls and sample-retention plan. <b>Engineering and Quality approval required before any evidence-altering action.</b>",
+    fields:[
+      F("action","Proposed action","textarea",{req:1}), F("rationale","Rationale","textarea",{req:1}),
+      F("method","Controlled method / work instruction","text",{req:1}), F("operator","Authorized operator","text",{req:1}),
+      F("equip","Equipment"), F("materials","Materials"),
+      F("preserve","Evidence-preservation controls","textarea",{req:1}), F("retain","Sample-retention plan","textarea",{req:1})
+    ]},
+  S7:{kind:"step", no:"Step 7", title:"Capture pre-action evidence", short:"Capture pre-action evidence", editors:["ENG"], photos:true,
+    guide:"Save measurements, waveforms, thermal images, microscope images, resistance/continuity data, component traceability, pad condition and known-good comparison. Identify all files to the PCBA and investigation record.",
+    fields:[
+      F("saved","Evidence saved","checks",{span:2,options:["Measurements","Waveforms","Thermal images","Microscope images","Resistance / continuity","Component traceability","Pad condition","Known-good comparison"]}),
+      F("loc","Evidence file location(s) / record IDs","textarea",{req:1,span:2}),
+      F("ident","All files identified to PCBA S/N and investigation record","confirm",{req:1,span:2})
+    ]},
+  S8:{kind:"step", no:"Step 8", title:"Apply controlled corrective action", short:"Controlled corrective action", editors:["RWK","ENG"], photos:true,
+    guide:"Perform the approved repair, rework, substitution or analysis. Record operator, date/time, equipment, materials, component P/N and lot/date code, process parameters and before/after photographs. Inspect the removed item and PCB area.",
+    fields:[
+      F("operator","Operator","text",{req:1}), F("when","Date / time","datetime-local",{req:1}),
+      F("work","Work performed","textarea",{req:1,span:2}),
+      F("equip","Equipment","text",{req:1}), F("materials","Materials"),
+      F("cpn","Replacement component P/N"), F("lot","Lot / date code"),
+      F("params","Process parameters","textarea",{span:2}),
+      F("inspect","Removed item and PCB-area inspection (microscope / X-ray / visual)","textarea",{req:1,span:2}),
+      F("retained","Retained item ID / location")
+    ]},
+  S9:{kind:"step", no:"Step 9", title:"Verify the failure mechanism", short:"Verify failure mechanism", editors:["ENG"],
+    guide:"Show the symptom existed before action, apply the controlled correction, and demonstrate that the symptom is removed under the original conditions. Independently verify the suspect component or interconnect where practical. <b>A pass after replacement alone is not proof of root cause.</b>",
+    fields:[
+      F("before","Evidence the symptom existed before action","textarea",{req:1}),
+      F("after","Result under original conditions after correction","textarea",{req:1}),
+      F("indep","Independent verification of suspect item","textarea",{span:2}),
+      F("mech","Failure mechanism statement","textarea",{req:1,span:2}),
+      F("verified","Mechanism verified?","radio",{req:1,span:2,options:[["yes","Yes — mechanism demonstrated"],["no","No — loop back to Step 6 and revise hypotheses"]]})
+    ]},
+  S10:{kind:"step", no:"Step 10", title:"Representative verification", short:"Representative verification", editors:["TEST"],
+    guide:"Repeat the original failing test, then complete applicable PCBA functional, loop, approved thermal, representative insert and tool-level tests. Confirm configuration, firmware and test records.",
+    fields:[
+      F("tests","Verification tests","table",{req:1,span:2,fixed:1,cols:[{k:"test",l:"Test",ro:1},{k:"proc",l:"Procedure / rev"},{k:"res",l:"Result",type:"select",options:["","Pass","Fail","N/A"]},{k:"ref",l:"Native data ref."}],
+        rows:[{test:"Original failing test (repeat)"},{test:"PCBA functional"},{test:"Loop test"},{test:"Approved thermal"},{test:"Representative insert"},{test:"Tool level"}]}),
+      F("cfg","Configuration, firmware and test records confirmed","confirm",{req:1,span:2}),
+      F("allpass","All applicable verification passed?","radio",{req:1,span:2,options:[["yes","Yes — proceed to disposition"],["no","No — loop back to Step 5 localization"]]})
+    ]},
+  GC:{kind:"gate", no:"Gate C", title:"Disposition and release", short:"Disposition & release", editors:["FA","QA"], approvers:["ENG","QA","TEST","MFG"],
+    guide:"Approve the conclusion confidence, affected-product scope, residual risk, repair/scrap/return/hold decision, verification results, deviation or concession, corrective action and any test/process change. <b>Engineering, Quality, Test and Manufacturing approval required before release.</b>",
+    fields:[
+      F("conf","Conclusion confidence","radio",{req:1,span:2,options:[["confirmed","Confirmed"],["probable","Probable"],["nff","No fault found"]]}),
+      F("cause","Conclusion / root-cause statement","textarea",{req:1,span:2}),
+      F("scope","Affected-product scope and rationale","textarea",{req:1}), F("risk","Residual risk","textarea",{req:1}),
+      F("disp","Disposition","radio",{req:1,span:2,options:[["repair","Repair"],["scrap","Scrap"],["return","Return"],["hold","Hold"],["other","Other"]]}),
+      F("dispNote","Disposition details"), F("dev","Deviation / concession ref.")
+    ]},
+  S11:{kind:"step", no:"Step 11", title:"Trend and feedback", short:"Trend & feedback", editors:["QA","FA"],
+    guide:"Update failure trends and initiate RCCA/CAPA, PFMEA, control-plan, handling, inspection, work-instruction or test-coverage actions as appropriate. Assign owner, due date and objective effectiveness evidence.",
+    fields:[
+      F("trend","Failure trend record updated","confirm",{req:1,span:2}),
+      F("actions","Corrective / feedback actions","table",{req:1,span:2,cols:[
+        {k:"type",l:"Type",type:"select",options:["","RCCA","CAPA","PFMEA","Control plan","Handling","Inspection","Work instruction","Test coverage","None required"]},
+        {k:"desc",l:"Action"},{k:"owner",l:"Owner"},{k:"due",l:"Due",type:"date"},{k:"eff",l:"Effectiveness evidence"},
+        {k:"st",l:"Status",type:"select",options:["","Open","In progress","Closed"]}]}),
+      F("summary","Closure summary","textarea",{span:2})
+    ]}
+};
+const ORDER = ["S1","S2","S3","GA","S4","SB","S5","S6","GB","S7","S8","S9","S10","GC","S11"];
+
+const BRANCH = {
+  R:{name:"Repeatable at PCBA level", guide:"Use the shortest test that consistently produces the symptom. Compare with a known-good PCBA using matching hardware and firmware. Capture input current, power rails, reset and clock, MCU/flash behavior, communications, drivers/I/O and analogue/sensor measurements.",
+     fields:[F("R_short","Shortest repeatable test","text",{req:1}), F("R_kg","Known-good control ID (matching HW/FW)","text",{req:1}),
+       F("R_meas","Measurements captured","checks",{span:2,options:["Input current","Power rails","Reset & clock","MCU / flash behavior","Communications","Drivers / I/O","Analogue / sensor"]}),
+       F("R_cmp","Side-by-side comparison vs known-good","textarea",{req:1,span:2})]},
+  T:{name:"Heat or soak dependent", guide:"Use only approved thermal conditions and limits. Log current, rails, communications and reset continuously. Use thermal imaging and controlled local heating/cooling only when authorized. Escalate to representative insert-level heat testing if the PCBA fixture cannot reproduce the actual load or mechanics.",
+     fields:[F("T_ok","Thermal conditions and limits are within the Gate A approval","confirm",{req:1,span:2}),
+       F("T_prof","Thermal profile / limits used","text",{req:1}), F("T_log","Continuous log reference (current, rails, comms, reset)","text",{req:1}),
+       F("T_img","Thermal imaging","radio",{options:[["used","Used"],["not","Not used"]]}), F("T_local","Controlled local heating / cooling","radio",{options:[["auth","Performed (authorized)"],["not","Not performed"]]}),
+       F("T_kg","Known-good control ID (if used)"), F("T_esc","Insert-level heat test escalation","radio",{options:[["no","Not required"],["yes","Escalated"]]}),
+       F("T_obs","Observations (onset temperature, soak time to failure, recovery)","textarea",{req:1,span:2})]},
+  I:{name:"Intermittent or handling sensitive", guide:"Preserve the as-received condition and monitor continuously. Perform only approved connector/harness checks. Investigate pins, connectors, solder joints, vias, inner-layer continuity, pads, component damage, PCB flex and installation/removal stress. Record each stimulus and response.",
+     fields:[F("I_mon","Continuous monitoring method","text",{req:1}), F("I_kg","Known-good control ID (if used)"),
+       F("I_areas","Areas investigated","checks",{span:2,options:["Pins","Connectors","Solder joints","Vias","Inner-layer continuity","Pads","Component damage","PCB flex","Installation / removal stress"]}),
+       F("I_log","Stimulus → response log","table",{req:1,span:2,cols:[{k:"stim",l:"Stimulus applied"},{k:"loc",l:"Location"},{k:"resp",l:"Response observed"},{k:"when",l:"Time"}]})]},
+  N:{name:"No fault found at PCBA level", guide:"<b>Do not close as NFF yet.</b> Compare the PCBA test with actual insert/tool conditions: load or simulator, mechanical latch, connectors, firmware, temperature, soak duration and duty cycle. Repeat or loop the test, then escalate to representative insert or tool-level testing as approved.",
+     fields:[F("N_eq","Test equivalence checked against actual insert / tool conditions","checks",{span:2,options:["Load / simulator","Mechanical latch","Connectors","Firmware","Temperature","Soak duration","Duty cycle"]}),
+       F("N_gap","Differences found between PCBA test and actual conditions","textarea",{span:2}),
+       F("N_loop","Repeat / loop test result","textarea",{req:1}), F("N_kg","Known-good control ID (if used)"),
+       F("N_esc","Escalation","radio",{req:1,span:2,options:[["insert","Insert-level test"],["tool","Tool-level test"],["none","Not escalated (justify below)"]]}),
+       F("N_escRes","Escalation result / justification","textarea",{req:1,span:2}),
+       F("outcome","Outcome","radio",{req:1,span:2,options:[["found","Fault reproduced at higher level → continue to Step 5 localization"],["nff","Still no fault found → skip localization, go to Step 6"]]})]}
+};
+
+/* 24-item checklist (pages 4–5 of template) */
+const CHECKS = [
+  {no:1, st:"S1", t:"Confirm identity, revision, configuration and symptom.", ev:"FDC/RQF; SAP/build history; PCBA, insert/tool and firmware records.", ow:"FA / Quality"},
+  {no:2, st:"S2", t:"Contain the PCBA and possible affected population.", ev:"Quarantine location, quantity, serial/lot scope, decision and approver.", ow:"Quality"},
+  {no:3, st:"S3", t:"Preserve as-received condition.", ev:"Timestamped photographs, packaging condition and chain-of-custody log.", ow:"FA owner"},
+  {no:4, st:"S3", t:"Complete incoming visual inspection.", ev:"Component, connector, solder, coating, contamination, flex and damage record.", ow:"Quality / Eng."},
+  {no:5, st:"GA", t:"Identify controlled requirements and limits.", ev:"Procedure/drawing/specification title, revision, step and acceptance criterion.", ow:"Test / Eng."},
+  {no:6, st:"GA", t:"Verify equipment, fixture and calibration.", ev:"Equipment ID, calibration due date, fixture/simulator revision and software.", ow:"Test"},
+  {no:7, st:"GA", t:"Approve diagnostic test plan.", ev:"Scope, limits, stop criteria, risks and approval signatures.", ow:"Test / Quality", gate:"A", auto:1},
+  {no:8, st:"S4", t:"Reproduce failure using reported configuration.", ev:"Native data, expected/actual, environment, setup photo and operator/date/time.", ow:"Test"},
+  {no:9, st:"S4", t:"Classify behavior and detection level.", ev:"R/T/I/N branch, frequency and PCBA/insert/tool/field detection level.", ow:"FA owner"},
+  {no:10,st:"SB", t:"Compare with known-good control.", ev:"Control identity, matching setup and side-by-side measurements.", ow:"Engineering"},
+  {no:11,st:"S5", t:"Localize functional block.", ev:"Current, rails, reset/clock, communications, memory, I/O and suspect nets.", ow:"Engineering"},
+  {no:12,st:"SB", t:"For NFF, verify test equivalence.", ev:"Actual vs simulated load, mechanics, firmware, temperature, soak and duty cycle.", ow:"Test / Eng.", nffOnly:1},
+  {no:13,st:"S6", t:"Rank plausible causes and separate facts from hypotheses.", ev:"Cause matrix covering method, material, tooling, measurement, environment, firmware and human factors.", ow:"FA owner"},
+  {no:14,st:"GB", t:"Authorize substitution, removal or destructive work.", ev:"Signed rationale, controlled method and sample-retention plan.", ow:"Eng. / Quality", gate:"B", auto:1},
+  {no:15,st:"S7", t:"Capture all pre-rework evidence.", ev:"Measurements, waveforms, thermal/microscope images and interconnect data.", ow:"Engineering"},
+  {no:16,st:"S8", t:"Execute controlled rework or substitution.", ev:"Operator, equipment, materials, component traceability, parameters and photos.", ow:"Authorized rework"},
+  {no:17,st:"S8", t:"Inspect removed item and PCB area.", ev:"Microscope/X-ray/visual findings, pads, solder and retained-item ID.", ow:"Quality / Eng."},
+  {no:18,st:"S9", t:"Verify mechanism, not only restored function.", ev:"Before/after evidence and independent component/interconnect verification.", ow:"Engineering"},
+  {no:19,st:"S10",t:"Repeat original failing test.", ev:"Native data showing failure absent under original conditions.", ow:"Test"},
+  {no:20,st:"S10",t:"Complete representative verification.", ev:"PCBA, loop, approved thermal, insert and tool-level tests as applicable.", ow:"Test"},
+  {no:21,st:"GC", t:"Define affected-product scope.", ev:"Serial/lot/date/rework/test-history review and scope rationale.", ow:"Quality / Eng."},
+  {no:22,st:"GC", t:"Assign conclusion confidence.", ev:"Confirmed, probable or NFF; evidence, uncertainty and residual risk.", ow:"FA owner"},
+  {no:23,st:"GC", t:"Approve disposition and release.", ev:"Disposition, verification, sign-offs and deviation/concession if applicable.", ow:"Eng./Q/Test/Mfg.", gate:"C", auto:1},
+  {no:24,st:"S11",t:"Issue corrective action and trend feedback.", ev:"RCCA/CAPA/PFMEA/test/work-instruction action, owner, due date and effectiveness.", ow:"Quality / Owner"}
+];
+
+/* Minimum evidence and record package (page 6) */
+const EVPKG = [
+  {g:"Identity and traceability", c:"FDC/RQF; PCBA P/N/SN/rev; insert/tool IDs; firmware; build, repair and test history.", k:"Identifiers agree across labels, system records and raw files.", ow:"FA / Quality", st:["S1"]},
+  {g:"As-received condition", c:"Timestamped photos, packaging, chain of custody, inspection and anomaly map.", k:"Captured before cleaning, rework, removal or evidence-altering checks.", ow:"Quality", st:["S2","S3"]},
+  {g:"Requirements", c:"Controlled procedure/drawing/specification, revision, step, expected result and limit.", k:"Missing or conflicting criteria are escalated to the document owner.", ow:"Eng. / Test", st:["GA"]},
+  {g:"Test setup and raw data", c:"Equipment/calibration IDs, fixture/simulator, software, wiring, environment and native files.", k:"Setup is reproducible; native data retained, not only screenshots.", ow:"Test", st:["GA","S4"]},
+  {g:"Diagnostic evidence", c:"Plan, measurements, waveforms, thermal images, known-good comparison and cause ranking.", k:"Each check states purpose, expected result, actual result and next branch.", ow:"Engineering", st:["SB","S5","S6"]},
+  {g:"Rework / destructive FA", c:"Approval, method, operator, materials, component traceability, photos and retained samples.", k:"No unauthorized action; sample identity and evidence loss recorded.", ow:"Eng. / Quality", st:["GB","S7","S8"]},
+  {g:"Verification / disposition", c:"Original test repeat, representative tests, scope, risk, disposition and release.", k:"Applicable tests pass; exceptions have approved deviation/concession.", ow:"Eng./Q/Test/Mfg.", st:["S9","S10","GC"]},
+  {g:"Corrective action / trending", c:"RCCA/CAPA, PFMEA/control plan/test updates, owner, due date and effectiveness.", k:"Action addresses occurrence or detection with objective evidence.", ow:"Quality / Owner", st:["S11"]}
+];
+
+/* ================= utilities ================= */
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const nowISO = () => new Date().toISOString();
+const fmt = iso => { if(!iso) return ""; const d=new Date(iso); if(isNaN(d)) return esc(iso);
+  return d.toLocaleString(undefined,{year:"numeric",month:"short",day:"2-digit",hour:"2-digit",minute:"2-digit"}); };
+const uid = () => (crypto.randomUUID ? crypto.randomUUID() : "id-"+Date.now().toString(36)+Math.random().toString(36).slice(2));
+const clone = o => JSON.parse(JSON.stringify(o));
+function stable(o){ if(Array.isArray(o)) return "["+o.map(stable).join(",")+"]";
+  if(o && typeof o==="object") return "{"+Object.keys(o).sort().map(k=>JSON.stringify(k)+":"+stable(o[k])).join(",")+"}";
+  return JSON.stringify(o===undefined?null:o); }
+function fnv(s){ let h=0x811c9dc5; for(let i=0;i<s.length;i++){ h^=s.charCodeAt(i); h=Math.imul(h,0x01000193)>>>0; } return h.toString(16).padStart(8,"0"); }
+const stageHash = st => fnv(stable({d:st.data, c:st.checks, p:(st.photos||[]).map(p=>p.id+"|"+(p.caption||""))}));
+function lsGet(k){ try{ return localStorage.getItem(k); }catch(e){ return null; } }
+function lsSet(k,v){ try{ localStorage.setItem(k,v); }catch(e){} }
+function toast(m){ const t=$("#toast"); t.textContent=m; t.classList.add("show"); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove("show"),3200); }
+
+/* ================= state ================= */
+let user = {name:"", role:""};
+try{ const u=JSON.parse(lsGet("faw.user")||"null"); if(u) user=u; }catch(e){}
+let S = null;          // current case
+let dirty = false;
+let selId = null;
+let view = "work";
+
+function blankStage(){ return {status:"open", data:{}, checks:{}, photos:[], signoff:null, submitted:null, approvals:{}, lastReject:null}; }
+function newCase(){
+  const s = {schema:SCHEMA, version:1, meta:{caseId:uid(), created:nowISO(), createdBy:user.name||"", rev:0, savedAt:null, savedBy:null, app:APP_VER}, stages:{}, loops:[], log:[]};
+  ORDER.forEach(id => s.stages[id]=blankStage());
+  return s;
+}
+function log(action, stage, note){ S.log.push({at:nowISO(), name:user.name, role:user.role, action, stage:stage||"", note:note||""}); }
+function markDirty(){ dirty=true; renderHeader(); saveDraft(); }
+let draftT=null;
+function saveDraft(){ clearTimeout(draftT); draftT=setTimeout(()=>{ lsSet("faw.draft", JSON.stringify({dirty, at:nowISO(), S})); },400); }
+
+/* ---------- derived status ---------- */
+const D = id => S.stages[id].data;
+function isNA(id){
+  const st=S.stages;
+  if(id==="S5" && D("S4").cls==="N" && D("SB").outcome==="nff" && st.SB.status==="complete") return true;
+  if(["GB","S7","S8","S9"].includes(id) && D("S6").path==="noaction" && st.S6.status==="complete") return true;
+  return false;
+}
+function eff(id){ return isNA(id) ? "na" : S.stages[id].status; }
+function activeId(){ return ORDER.find(id => !["complete","na"].includes(eff(id))) || null; }
+function dstat(id){
+  const e=eff(id); if(e==="na"||e==="complete") return e;
+  const a=activeId(); if(a && ORDER.indexOf(id)>ORDER.indexOf(a)) return "locked";
+  if(e==="pending"||e==="rejected") return e;
+  return "active";
+}
+const STATUS_TXT = {complete:"Complete", active:"In progress", pending:"Awaiting approval", rejected:"Rejected — revise", locked:"Not started", na:"Not applicable"};
+function canEdit(id){
+  if(!user.role || user.role==="VIEW") return false;
+  const ds=dstat(id); if(!["active","rejected"].includes(ds)) return false;
+  return STAGES[id].editors.includes(user.role);
+}
+function fieldsFor(id){
+  if(id!=="SB") return STAGES[id].fields;
+  const b=D("S4").cls; return b && BRANCH[b] ? BRANCH[b].fields : [];
+}
+function checksFor(id){ return CHECKS.filter(c=>c.st===id); }
+function checkState(c){
+  const st=S.stages[c.st];
+  if(isNA(c.st)) return "na";
+  if(c.auto) return st.status==="complete" ? "done" : "";
+  if(c.nffOnly && D("S4").cls && D("S4").cls!=="N") return "na";
+  return st.checks[c.no]||"";
+}
+function isEmpty(f,v){
+  if(f.type==="confirm") return !v;
+  if(f.type==="checks") return !(v&&v.length);
+  if(f.type==="table") return !(Array.isArray(v) && v.some(r=>Object.entries(r).some(([k,x])=>{ const col=f.cols.find(c=>c.k===k); return col && !col.ro && String(x||"").trim(); })));
+  return !String(v??"").trim();
+}
+function missing(id){
+  const out=[]; const d=D(id);
+  if(id==="SB" && !D("S4").cls) out.push("Branch classification in Step 4");
+  (fieldsFor(id)||[]).forEach(f=>{ if(f.req && isEmpty(f,d[f.key])) out.push(f.label); });
+  checksFor(id).forEach(c=>{ if(!c.auto && !checkState(c)) out.push("Checklist item "+c.no); });
+  return out;
+}
+
+/* ================= actions ================= */
+function sign(){ return {name:user.name, role:user.role, at:nowISO()}; }
+function resetFrom(fromId, toId){ // reopen fromId..toId inclusive (toId default end)
+  const a=ORDER.indexOf(fromId), b= toId? ORDER.indexOf(toId) : ORDER.length-1;
+  for(let i=a;i<=b;i++){ const st=S.stages[ORDER[i]]; st.status="open"; st.signoff=null; st.submitted=null; st.approvals={}; }
+}
+function completeStep(id){
+  const m=missing(id);
+  if(m.length){ showMissing(id,m); return; }
+  const st=S.stages[id];
+  if(id==="S9" && st.data.verified==="no") return loopBack("S9","S6");
+  if(id==="S10" && st.data.allpass==="no") return loopBack("S10","S5");
+  st.signoff=Object.assign(sign(),{hash:stageHash(st)}); st.status="complete";
+  log("Signed complete", id);
+  if(id==="S11") log("Case closed", "S11");
+  after(`${STAGES[id].no} signed by ${user.name}`, true);
+}
+function submitGate(id){
+  const m=missing(id); if(m.length){ showMissing(id,m); return; }
+  const st=S.stages[id];
+  st.submitted=Object.assign(sign(),{hash:stageHash(st)}); st.status="pending"; st.approvals={}; st.lastReject=null;
+  log("Submitted for approval", id);
+  after(`${STAGES[id].no} submitted for approval`);
+}
+function approve(id){
+  const st=S.stages[id];
+  st.approvals[user.role]=Object.assign(sign(),{decision:"approved", hash:stageHash(st)});
+  log("Approved", id);
+  if(STAGES[id].approvers.every(r=>st.approvals[r] && st.approvals[r].decision==="approved")){
+    st.status="complete"; st.signoff={name:user.name, role:user.role, at:nowISO(), hash:stageHash(st)};
+    log("Gate released (all approvals)", id);
+    after(`${STAGES[id].no} fully approved — released`, true);
+  } else after(`Approved as ${rn(user.role)}`);
+}
+function reject(id){
+  ask("Reject "+STAGES[id].no, "State what must change before you can approve. This goes back to the preparer.", "", txt=>{
+    if(!txt.trim()){ toast("A reason is required to reject"); return false; }
+    const st=S.stages[id];
+    st.lastReject=Object.assign(sign(),{comment:txt.trim()}); st.status="rejected"; st.approvals={};
+    log("Rejected", id, txt.trim()); after(`${STAGES[id].no} rejected — returned to preparer`);
+  });
+}
+function loopBack(from,to){
+  ask(`Loop back to ${STAGES[to].no}`, `${STAGES[from].no} result is negative. ${STAGES[to].no} through ${STAGES[from].no} will be reopened (data is kept; signatures are cleared). Record what was learned:`, "", txt=>{
+    if(!txt.trim()){ toast("Please record the reason"); return false; }
+    const snap=clone(S.stages[from].data);
+    S.loops.push({at:nowISO(), name:user.name, role:user.role, from, to, reason:txt.trim(), snapshot:snap, iteration:S.loops.filter(l=>l.from===from).length+2});
+    resetFrom(to, from);
+    if(from==="S9") delete S.stages.S9.data.verified;
+    if(from==="S10") delete S.stages.S10.data.allpass;
+    log("Loop back to "+STAGES[to].no, from, txt.trim());
+    selId=to; after(`Reopened from ${STAGES[to].no} — iteration ${S.loops.length+1}`);
+  });
+}
+function reopen(id){
+  ask("Reopen "+STAGES[id].no, "This stage and every later stage will be reopened for editing; their signatures and approvals are cleared (data is kept). Reason:", "", txt=>{
+    if(!txt.trim()){ toast("A reason is required"); return false; }
+    resetFrom(id); log("Reopened", id, txt.trim()); selId=id; after(`${STAGES[id].no} reopened`);
+  });
+}
+function after(msg, advance){
+  markDirty();
+  if(advance){ const a=activeId(); if(a) selId=a; }
+  renderAll(); if(msg) toast(msg);
+  window.scrollTo({top:0,behavior:"smooth"});
+}
+function showMissing(id,m){
+  renderStage(true);
+  toast("Complete required items: "+m.slice(0,3).join(", ")+(m.length>3?` (+${m.length-3} more)`:""));
+}
+
+/* ================= rendering ================= */
+function renderHeader(){
+  const s1=D("S1"); const lab=[s1.fdc, s1.pn, s1.sn && "S/N "+s1.sn].filter(Boolean).join(" · ");
+  $("#caseLabel").textContent = lab || "New case (unsaved)";
+  $("#caseLabel").title = "Case ID "+S.meta.caseId+" · rev "+S.meta.rev;
+  const df=$("#dirtyFlag");
+  if(dirty){ df.className="dirty"; df.textContent="Unsaved changes"; }
+  else { df.className="clean"; df.textContent = S.meta.savedAt ? "Saved rev "+S.meta.rev : "No changes"; }
+  $("#whoAv").textContent = user.role ? ROLES[user.role].ab : "?";
+  $("#whoName").textContent = user.name || "Choose role";
+  $("#whoRole").textContent = user.role ? "· "+rn(user.role) : "";
+}
+function renderRail(){
+  let h="<h4>Process</h4>";
+  ORDER.forEach(id=>{
+    const s=STAGES[id], ds=dstat(id);
+    const title = id==="SB" && D("S4").cls ? `Branch ${D("S4").cls} — ${BRANCH[D("S4").cls].name}` : s.title;
+    const roles = s.kind==="gate" ? "Approve: "+s.approvers.map(r=>ROLES[r].ab).join(" · ") : s.editors.map(r=>ROLES[r].ab).join(" · ");
+    h+=`<div class="ri st-${ds} ${s.kind==="gate"?"gate":""} ${id===selId?"sel":""}" data-sel="${id}">
+      <span class="dot"></span><div><div class="k">${esc(s.no)}${s.kind==="gate"?" · HOLD":""}</div><div class="t">${esc(title)}</div><div class="o">${roles} — ${STATUS_TXT[ds]}</div></div></div>`;
+  });
+  $("#rail").innerHTML=h;
+}
+function nextAction(){
+  const a=activeId();
+  if(!a) return {done:true, text:"FA case closed", sub:"All stages complete. Print the final report for the record."};
+  const s=STAGES[a], st=S.stages[a];
+  if(s.kind==="gate" && st.status==="pending"){
+    const out=s.approvers.filter(r=>!(st.approvals[r]&&st.approvals[r].decision==="approved"));
+    return {id:a, roles:out, you:out.includes(user.role), text:`${s.no} · ${s.title} — awaiting approval`, sub:"Outstanding: "+out.map(rn).join(", ")};
+  }
+  const rj = st.status==="rejected" ? ` (rejected by ${rn(st.lastReject.role)}: "${st.lastReject.comment}")` : "";
+  return {id:a, roles:s.editors, you:s.editors.includes(user.role), text:`${s.no} · ${s.title}${rj}`, sub:"Owner: "+s.editors.map(rn).join(" or ")};
+}
+function renderBanner(){
+  const n=nextAction(); let h;
+  if(n.done) h=`<div class="banner done"><div class="msg"><b>✓ ${esc(n.text)}</b><span>${esc(n.sub)}</span></div><button class="btn" data-act="print">Print final report</button></div>`;
+  else if(n.you) h=`<div class="banner you"><div class="msg"><b>Your turn — ${esc(n.text)}</b><span>${esc(n.sub)}</span></div>${selId!==n.id?`<button class="btn pri" data-sel="${n.id}">Open</button>`:""}</div>`;
+  else h=`<div class="banner wait"><div class="msg"><b>Waiting on ${esc(n.roles.map(rn).join(" / "))}</b><span>${esc(n.text)}</span></div><button class="btn pri" data-act="send" data-role="${n.roles[0]}">Send to ${esc(rn(n.roles[0]))}…</button></div>`;
+  $("#banner").innerHTML=h;
+}
+
+function optList(o){ return o.map(x=>Array.isArray(x)?x:[x,x]); }
+function renderField(f, v, ed, showMiss){
+  const miss = showMiss && f.req && isEmpty(f,v) ? " miss" : "";
+  const dis = ed ? "" : " disabled";
+  const lab = `${esc(f.label)}${f.req?' <span class="req">*</span>':""}`;
+  const cls = "fld"+(f.span===2?" span2":"");
+  const id = "f_"+f.key;
+  switch(f.type){
+    case "textarea": return `<div class="${cls}"><label for="${id}">${lab}</label><textarea class="inp${miss}" id="${id}" data-k="${f.key}"${dis}>${esc(v)}</textarea></div>`;
+    case "select": return `<div class="${cls}"><label for="${id}">${lab}</label><select class="inp${miss}" id="${id}" data-k="${f.key}"${dis}>${optList(f.options).map(([a,b])=>`<option value="${esc(a)}"${a===(v||"")?" selected":""}>${esc(b||"— select —")}</option>`).join("")}</select></div>`;
+    case "radio": return `<div class="${cls}"><span class="lab">${lab}</span><div class="opts${miss?" missbox":""}" ${miss?'style="outline:1px solid var(--bad);outline-offset:3px;border-radius:5px"':""}>${optList(f.options).map(([a,b])=>`<label class="opt${v===a?" on":""}${ed?"":" dis"}"><input type="radio" name="${f.key}" data-k="${f.key}" value="${esc(a)}"${v===a?" checked":""}${dis}>${esc(b)}</label>`).join("")}</div></div>`;
+    case "checks": { const arr=v||[]; return `<div class="${cls}"><span class="lab">${lab}</span><div class="opts">${f.options.map(o=>`<label class="opt${arr.includes(o)?" on":""}${ed?"":" dis"}"><input type="checkbox" data-k="${f.key}" data-opt="${esc(o)}"${arr.includes(o)?" checked":""}${dis}>${esc(o)}</label>`).join("")}</div></div>`; }
+    case "confirm": return `<div class="${cls}"><label class="confirm${v?" on":""}" ${miss?'style="border-color:var(--bad)"':""}><input type="checkbox" data-k="${f.key}"${v?" checked":""}${dis}><span>${lab}</span></label></div>`;
+    case "table": {
+      const rows = Array.isArray(v)&&v.length ? v : (f.rows? clone(f.rows) : [{}]);
+      let t=`<div class="${cls}"><span class="lab">${lab}</span><div class="tblwrap"><table class="ftbl" ${miss?'style="outline:1px solid var(--bad)"':""}><thead><tr><th style="width:28px">#</th>${f.cols.map(c=>`<th>${esc(c.l)}</th>`).join("")}${ed&&!f.fixed?"<th style='width:30px'></th>":""}</tr></thead><tbody>`;
+      rows.forEach((r,i)=>{
+        t+=`<tr><td style="text-align:center;color:var(--mute);font-size:12px;padding-top:9px">${i+1}</td>`;
+        f.cols.forEach(c=>{
+          const cv=r[c.k]||""; const a=`data-t="${f.key}" data-r="${i}" data-c="${c.k}"`;
+          if(c.ro) t+=`<td style="padding:8px;font-weight:600">${esc(cv)}</td>`;
+          else if(c.type==="select") t+=`<td><select class="inp" ${a}${dis}>${c.options.map(o=>`<option${o===cv?" selected":""} value="${esc(o)}">${esc(o||"—")}</option>`).join("")}</select></td>`;
+          else if(c.type==="date") t+=`<td><input type="date" class="inp" ${a} value="${esc(cv)}"${dis}></td>`;
+          else t+=`<td><textarea class="inp" rows="1" ${a}${dis}>${esc(cv)}</textarea></td>`;
+        });
+        if(ed&&!f.fixed) t+=`<td><button class="xbtn" title="Remove row" data-delrow="${f.key}" data-r="${i}">×</button></td>`;
+        t+="</tr>";
+      });
+      t+="</tbody></table></div>"+(ed&&!f.fixed?`<div><button class="btn sm" data-addrow="${f.key}">+ Add row</button></div>`:"")+"</div>";
+      return t;
+    }
+    default: return `<div class="${cls}"><label for="${id}">${lab}</label><input class="inp${miss}" id="${id}" type="${f.type}" data-k="${f.key}" value="${esc(v)}"${dis}></div>`;
+  }
+}
+
+function renderStage(showMiss){
+  const id=selId, s=STAGES[id], st=S.stages[id], ds=dstat(id), ed=canEdit(id);
+  const gate = s.kind==="gate";
+  const branch = D("S4").cls;
+  let h=`<div class="card">`;
+  if(gate) h+=`<div class="holdband">■ HOLD POINT — ${s.approvers.map(rn).join(", ").toUpperCase()} APPROVAL REQUIRED BEFORE PROCEEDING</div>`;
+  const title = id==="SB" && branch ? `Branch ${branch} — ${BRANCH[branch].name}` : s.title;
+  const iter = S.loops.filter(l=>ORDER.indexOf(id)>=ORDER.indexOf(l.to) && ORDER.indexOf(id)<=ORDER.indexOf(l.from)).length;
+  h+=`<div class="shead ${gate?"gate":""}"><span class="num">${esc(s.no)}</span><div style="flex:1;min-width:200px"><h2>${esc(title)}</h2>
+    <div class="meta">${gate?"Prepared by: ":"Owner: "}${s.editors.map(r=>`<span class="chip${r===user.role?" me":""}">${rn(r)}</span>`).join("")}
+    ${gate?" &nbsp;Approvers: "+s.approvers.map(r=>`<span class="chip${r===user.role?" me":""}">${rn(r)}</span>`).join(""):""}</div></div>
+    <div style="text-align:right">${iter?`<span class="pill pending" style="margin-right:6px">Iteration ${iter+1}</span>`:""}<span class="pill ${ds}">${STATUS_TXT[ds]}</span></div></div>`;
+  h+=`<div class="guide">${s.guide}${id==="SB"&&branch?"<br><br><b>Branch "+branch+":</b> "+BRANCH[branch].guide:""}</div><div class="sbody">`;
+
+  // notices
+  if(ds==="locked") h+=`<div class="infobox">This stage opens after the earlier stages are complete. You can view it, but not edit it yet.</div>`;
+  if(ds==="na") h+=`<div class="infobox">Not applicable for this case — bypassed by the decision recorded in ${id==="S5"?"the NFF branch outcome":"Step 6 (no evidence-altering action)"}.</div>`;
+  if(st.status==="rejected" && st.lastReject) h+=`<div class="warnbox"><b>Rejected by ${esc(st.lastReject.name)} (${rn(st.lastReject.role)}) on ${fmt(st.lastReject.at)}:</b> ${esc(st.lastReject.comment)}</div>`;
+  if(st.status==="complete" && st.signoff && st.signoff.hash && st.signoff.hash!==stageHash(st)) h+=`<div class="warnbox"><b>Integrity warning:</b> data in this stage differs from what was signed. The file may have been edited outside the app.</div>`;
+  const lp=S.loops.filter(l=>l.to===id); if(lp.length) h+=`<div class="loopbox"><b>Reopened by loop-back:</b> ${lp.map(l=>`${fmt(l.at)} — ${esc(l.name)}: “${esc(l.reason)}”`).join("<br>")}</div>`;
+  if(!ed && ["active","rejected"].includes(ds) && user.role && user.role!=="VIEW") h+=`<div class="infobox">You are signed in as <b>${rn(user.role)}</b>. This stage is completed by ${s.editors.map(rn).join(" or ")}. Use <b>Send to…</b> to pass the file on.</div>`;
+
+  // fields
+  const fl=fieldsFor(id)||[];
+  if(id==="SB" && !branch) h+=`<div class="infobox">Select the behavior classification in Step 4 first — it decides which branch checks appear here.</div>`;
+  if(fl.length){ h+=`<div class="sec">Record</div><div class="grid">`+fl.map(f=>renderField(f, st.data[f.key], ed, showMiss)).join("")+`</div>`; }
+
+  // photos
+  if(s.photos){
+    h+=`<div class="sec">Evidence photos</div><div class="photos">`;
+    (st.photos||[]).forEach((p,i)=>{ h+=`<div class="ph"><img src="${p.data}" alt="${esc(p.caption||p.name)}" data-zoom="${i}">${ed?`<button class="xbtn" data-delph="${i}" title="Remove">×</button>`:""}<input class="inp" placeholder="Caption" data-ph="${i}" value="${esc(p.caption||"")}"${ed?"":" disabled"}><div class="by">${esc(p.by||"")} · ${fmt(p.at)}</div></div>`; });
+    if(ed) h+=`<div class="addph" data-addph="1">+ Add photos<br><span class="small">Resized to 1280 px and stored in the case file</span></div>`;
+    if(!ed && !(st.photos||[]).length) h+=`<div class="small">No photos.</div>`;
+    h+=`</div>`;
+  }
+
+  // checklist
+  const cl=checksFor(id);
+  if(cl.length){
+    h+=`<div class="sec">Hold-point checklist</div>`;
+    cl.forEach(c=>{
+      const cs=checkState(c); const autoNA = c.nffOnly && branch && branch!=="N";
+      let ctl;
+      if(c.auto) ctl=`<span class="autotag">${cs==="done"?"✓ Satisfied by gate approval":"Satisfied by Gate "+c.gate+" approval"}</span>`;
+      else if(autoNA || isNA(id)) ctl=`<span class="autotag">N/A${autoNA?" (branch "+branch+")":""}</span>`;
+      else ctl=`<button class="seg d${cs==="done"?" on":""}" data-chk="${c.no}" data-v="done"${ed?"":" disabled"}>Done</button><button class="seg n${cs==="na"?" on":""}" data-chk="${c.no}" data-v="na"${ed?"":" disabled"}>N/A</button>`;
+      const missc = showMiss && !c.auto && !cs ? ' style="border-color:var(--bad)"':"";
+      h+=`<div class="chk ${cs==="done"?"isdone":""} ${c.gate?"gatechk":""}"${missc}><span class="no">${c.no}${c.gate?"<br>"+c.gate:""}</span><div class="tx"><b>${esc(c.t)}</b><span>${esc(c.ev)} · ${esc(c.ow)}</span></div><div class="ctl">${ctl}</div></div>`;
+    });
+  }
+
+  // approvals table
+  if(gate){
+    h+=`<div class="sec">Approvals</div><table class="appr"><tr><th>Role</th><th>Decision</th><th>Name</th><th>Date</th></tr>`;
+    if(st.submitted) h+=`<tr><td>Prepared by</td><td>Submitted</td><td>${esc(st.submitted.name)} (${rn(st.submitted.role)})</td><td>${fmt(st.submitted.at)}</td></tr>`;
+    s.approvers.forEach(r=>{ const a=st.approvals[r];
+      h+=`<tr><td><b>${rn(r)}</b></td><td>${a?'<span class="pill complete">Approved</span>':(st.status==="pending"?'<span class="pill pending">Pending</span>':"—")}</td><td>${a?esc(a.name):""}</td><td>${a?fmt(a.at):""}</td></tr>`; });
+    h+=`</table>`;
+  }
+  h+=`</div>`;
+
+  // footer
+  let note="", btns="";
+  if(st.signoff && st.status==="complete") note=`<span class="sig">Signed: <b>${esc(st.signoff.name)}</b> (${rn(st.signoff.role)}) · ${fmt(st.signoff.at)}</span>`;
+  else if(ed) note= gate ? "Fill the plan, tick the checks, then submit. Each approver signs in their own role." : "Required fields are marked *. Signing locks this stage and opens the next.";
+  if(ed){
+    if(gate) btns=`<button class="btn pri" data-act="submit">Submit for approval</button>`;
+    else if(id==="S9" && st.data.verified==="no") btns=`<button class="btn warn" data-act="complete">Record result &amp; loop back to Step 6</button>`;
+    else if(id==="S10" && st.data.allpass==="no") btns=`<button class="btn warn" data-act="complete">Record result &amp; loop back to Step 5</button>`;
+    else btns=`<button class="btn ok" data-act="complete">Sign &amp; complete ${esc(s.no)}</button>`;
+  }
+  if(gate && st.status==="pending" && s.approvers.includes(user.role) && !(st.approvals[user.role])){
+    btns+=`<button class="btn bad" data-act="reject">Reject</button><button class="btn ok" data-act="approve">Approve as ${rn(user.role)}</button>`;
+    note=`Review the plan above. Approving stamps your name, role and time.`;
+  }
+  if(st.status!=="open" && user.role==="FA" && ds!=="na" && st.status!=="rejected") btns+=`<button class="btn" data-act="reopen">Reopen…</button>`;
+  if(note||btns) h+=`<div class="foot"><div class="note">${note}</div>${btns}</div>`;
+  h+=`</div>`;
+  $("#stage").innerHTML=h;
+}
+
+/* ---------- flowchart SVG ---------- */
+function flowSVG(neutral){
+  const W=640, CX=320;
+  const P = {complete:["#e8f5ee","#1e7b4f","#0f3d27"], active:["#ffffff","#1f5fbf","#13213b"], pending:["#fff5e2","#a76400","#4a2c00"],
+             rejected:["#fdecea","#b3261e","#5c130f"], locked:["#f5f6f8","#b9c0cb","#6b7487"], na:["#ffffff","#c5cad3","#9aa2b1"], neutral:["#ffffff","#13213b","#13213b"]};
+  const ST = id => neutral ? "neutral" : dstat(id);
+  const TAG = {complete:"✓ DONE", active:"● NOW", pending:"AWAITING APPROVAL", rejected:"REJECTED", locked:"", na:"N/A", neutral:""};
+  let g="";
+  const T=(x,y,t,o="")=>`<text x="${x}" y="${y}" ${o}>${esc(t)}</text>`;
+  const arrow=(d,dash)=>`<path d="${d}" fill="none" stroke="#56627a" stroke-width="1.6" ${dash?'stroke-dasharray="6 4"':""} marker-end="url(#ah)"/>`;
+  const line=(d,dash)=>`<path d="${d}" fill="none" stroke="#56627a" stroke-width="1.6" ${dash?'stroke-dasharray="6 4"':""}/>`;
+  const roles = id => STAGES[id].editors.map(r=>ROLES[r].ab).join(" · ");
+  function box(id,y){
+    const s=ST(id), [f,st,tx]=P[s], x=CX-150, w=300, h=50, na=s==="na";
+    return `<g data-go="${id}"><rect x="${x}" y="${y}" width="${w}" height="${h}" rx="6" fill="${f}" stroke="${st}" stroke-width="${s==="active"?2.6:1.6}" ${na?'stroke-dasharray="5 4"':""}/>
+      ${T(x+14,y+19,STAGES[id].no.toUpperCase(),`font-size="10" font-weight="700" letter-spacing="1" fill="${s==="neutral"?"#6b7487":st}"`)}
+      ${T(x+w-12,y+19,roles(id),`font-size="10" fill="#6b7487" text-anchor="end"`)}
+      ${T(x+14,y+38,STAGES[id].short,`font-size="14.5" font-weight="700" fill="${tx}" ${na?'text-decoration="line-through"':""}`)}
+      ${TAG[s]?T(x+w-12,y+38,TAG[s],`font-size="9.5" font-weight="700" fill="${st}" text-anchor="end"`):""}</g>`;
+  }
+  function hex(id,y){
+    const s=ST(id), [f,st,tx]=P[s], x=CX-165, w=330, h=60, na=s==="na";
+    const pts=[[x,y+h/2],[x+18,y],[x+w-18,y],[x+w,y+h/2],[x+w-18,y+h],[x+18,y+h]].map(p=>p.join(",")).join(" ");
+    return `<g data-go="${id}"><polygon points="${pts}" fill="${f}" stroke="${s==="neutral"||s==="locked"?"#b3261e":st}" stroke-width="${s==="active"?2.6:1.8}" ${na?'stroke-dasharray="5 4"':""}/>
+      ${T(x+30,y+19,STAGES[id].no.toUpperCase()+" · HOLD POINT",`font-size="10" font-weight="700" letter-spacing="1" fill="#b3261e"`)}
+      ${T(x+30,y+37,STAGES[id].short,`font-size="14" font-weight="700" fill="${tx}" ${na?'text-decoration="line-through"':""}`)}
+      ${T(x+30,y+51,"Approve: "+STAGES[id].approvers.map(r=>ROLES[r].ab).join(" · "),`font-size="9.5" fill="#6b7487"`)}
+      ${TAG[s]?T(x+w-30,y+19,TAG[s],`font-size="9.5" font-weight="700" fill="${st}" text-anchor="end"`):""}</g>`;
+  }
+  function dia(go,y,l1,l2){
+    const s=ST(go), done = s==="complete"; const st = neutral?"#13213b":(done?"#1e7b4f":"#56627a"); const f= done&&!neutral?"#f3faf6":"#ffffff";
+    return `<g data-go="${go}"><polygon points="${CX},${y} ${CX+135},${y+42} ${CX},${y+84} ${CX-135},${y+42}" fill="${f}" stroke="${st}" stroke-width="1.6"/>
+      ${T(CX,y+39,l1,`font-size="12.5" font-weight="700" fill="#13213b" text-anchor="middle"`)}${T(CX,y+55,l2,`font-size="12.5" font-weight="700" fill="#13213b" text-anchor="middle"`)}</g>`;
+  }
+  function term(y,t){ return `<rect x="${CX-110}" y="${y}" width="220" height="34" rx="17" fill="#13213b"/>${T(CX,y+22,t,`font-size="13" font-weight="700" fill="#fff" text-anchor="middle"`)}`; }
+  const lbl=(x,y,t,a="start")=>T(x,y,t,`font-size="11" font-weight="700" fill="#56627a" text-anchor="${a}"`);
+
+  // layout
+  g+=term(16,"Failed PCBA received");             g+=arrow(`M${CX} 50 V72`);
+  g+=box("S1",74);  g+=arrow(`M${CX} 124 V146`);
+  g+=box("S2",148); g+=arrow(`M${CX} 198 V220`);
+  g+=box("S3",222); g+=arrow(`M${CX} 272 V292`);
+  g+=hex("GA",294); g+=T(CX+175,328,"Reject → revise plan",'font-size="10" fill="#b3261e" font-style="italic"');
+  g+=arrow(`M${CX} 354 V376`);
+  g+=box("S4",378); g+=arrow(`M${CX} 428 V450`);
+  g+=dia("S4",452,"Classify observed","behaviour (R/T/I/N)");
+  // branches
+  const bw=146, gap=8, bx0=16, by=566; const cls=D("S4").cls; const sbS=ST("SB");
+  const centers=[0,1,2,3].map(i=>bx0+i*(bw+gap)+bw/2);
+  g+=line(`M${CX} 536 V550`); g+=line(`M${centers[0]} 550 H${centers[3]}`);
+  const BL=[["R","Repeatable","at PCBA level"],["T","Heat or soak","dependent"],["I","Intermittent /","handling sensitive"],["N","No fault found","at PCBA level"]];
+  BL.forEach(([k,a,b],i)=>{
+    const x=bx0+i*(bw+gap); let s;
+    if(neutral) s="neutral"; else if(!cls) s= sbS==="locked"?"locked":"locked"; else s = (k===cls)? sbS : "na";
+    const [f,st,tx]=P[s];
+    g+=arrow(`M${centers[i]} 550 V${by-2}`);
+    g+=`<g data-go="SB"><rect x="${x}" y="${by}" width="${bw}" height="60" rx="6" fill="${f}" stroke="${st}" stroke-width="${s==="active"?2.6:1.6}" ${s==="na"?'stroke-dasharray="5 4"':""}/>
+      ${T(x+12,by+38,k,`font-size="24" font-weight="800" fill="${s==="na"?"#c5cad3":(s==="neutral"?"#1f5fbf":st)}"`)}
+      ${T(x+38,by+26,a,`font-size="12" font-weight="700" fill="${tx}"`)}${T(x+38,by+42,b,`font-size="11" fill="${tx}"`)}</g>`;
+    g+=line(`M${centers[i]} ${by+60} V${by+76}`);
+  });
+  g+=line(`M${centers[0]} ${by+76} H${centers[3]}`);
+  g+=T(centers[3]+bw/2-4, by+92, "NFF → skip to Step 6", 'font-size="10" fill="#56627a" text-anchor="end" font-style="italic"');
+  g+=arrow(`M${CX} ${by+76} V668`);
+  g+=box("S5",670); g+=arrow(`M${CX} 720 V742`);
+  g+=box("S6",744); g+=arrow(`M${CX} 794 V816`);
+  g+=dia("S6",818,"Evidence-altering","action needed?");
+  g+=arrow(`M${CX} 902 V928`); g+=lbl(CX+8,918,"Yes");
+  g+=hex("GB",930); g+=T(CX+175,964,"Reject → revise",'font-size="10" fill="#b3261e" font-style="italic"');
+  g+=arrow(`M${CX} 990 V1012`);
+  g+=box("S7",1014); g+=arrow(`M${CX} 1064 V1086`);
+  g+=box("S8",1088); g+=arrow(`M${CX} 1138 V1160`);
+  g+=box("S9",1162); g+=arrow(`M${CX} 1212 V1234`);
+  g+=dia("S9",1236,"Mechanism","verified?");
+  g+=arrow(`M${CX} 1320 V1348`); g+=lbl(CX+8,1338,"Yes");
+  g+=box("S10",1350); g+=arrow(`M${CX} 1400 V1422`);
+  g+=dia("S10",1424,"All verification","passed?");
+  g+=arrow(`M${CX} 1508 V1534`); g+=lbl(CX+8,1524,"Yes");
+  g+=hex("GC",1536); g+=T(CX+175,1570,"Reject → revise",'font-size="10" fill="#b3261e" font-style="italic"');
+  g+=arrow(`M${CX} 1596 V1618`);
+  g+=box("S11",1620); g+=arrow(`M${CX} 1670 V1692`);
+  g+=term(1694,"FA closed · record filed");
+  // bypass & loops
+  g+=arrow(`M${CX+135} 860 H${W-14} V1375 H${CX+152}`, true); g+=lbl(CX+142,852,"No");
+  g+=T(W-1,1120,"No action needed (NFF / test issue)",`font-size="10" fill="#56627a" font-style="italic" text-anchor="middle" transform="rotate(90 ${W-1} 1120)"`);
+  g+=arrow(`M${CX-135} 1278 H44 V769 H${CX-152}`, true); g+=lbl(CX-142,1270,"No","end");
+  g+=T(36,1020,"Revise hypotheses",`font-size="10" fill="#56627a" font-style="italic" text-anchor="middle" transform="rotate(-90 36 1020)"`);
+  g+=arrow(`M${CX-135} 1466 H14 V695 H${CX-152}`, true); g+=lbl(CX-142,1458,"No","end");
+  g+=T(8,1100,"Re-localize",`font-size="10" fill="#56627a" font-style="italic" text-anchor="middle" transform="rotate(-90 8 1100)"`);
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="-6 0 ${W+12} 1740" font-family="Segoe UI, system-ui, Arial, sans-serif" role="img" aria-label="PCBA failure analysis flowchart">
+    <defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#56627a"/></marker></defs>${g}</svg>`;
+}
+
+/* ---------- checklist & history views ---------- */
+function renderCheck(){
+  let h=`<h3 class="h">PCBA FA checklist — 24 hold points</h3><div class="tblwrap"><table class="dtbl"><tr><th>No.</th><th>Check / hold point</th><th>Required evidence or record</th><th>Owner</th><th>Stage</th><th>Gate</th><th>Status</th></tr>`;
+  CHECKS.forEach(c=>{ const cs=checkState(c);
+    h+=`<tr><td class="c"><b>${c.no}</b></td><td>${esc(c.t)}</td><td>${esc(c.ev)}</td><td>${esc(c.ow)}</td><td><a data-goto="${c.st}">${esc(STAGES[c.st].no)}</a></td><td class="c" style="color:var(--gate);font-weight:700">${c.gate||""}</td>
+      <td>${cs==="done"?'<span class="pill complete">Done</span>':cs==="na"?'<span class="pill na">N/A</span>':'<span class="pill locked">Open</span>'}</td></tr>`; });
+  h+=`</table></div><h3 class="h">Minimum evidence and record package</h3><div class="tblwrap"><table class="dtbl"><tr><th>Record group</th><th>Minimum content</th><th>Completeness check</th><th>Owner</th><th>Status</th></tr>`;
+  EVPKG.forEach(e=>{ const ok=e.st.every(id=>["complete","na"].includes(eff(id)));
+    h+=`<tr><td><b>${esc(e.g)}</b></td><td>${esc(e.c)}</td><td>${esc(e.k)}</td><td>${esc(e.ow)}</td><td>${ok?'<span class="pill complete">Complete</span>':'<span class="pill locked">Open</span>'}</td></tr>`; });
+  h+=`</table></div>`;
+  $("#view-check").innerHTML=h;
+}
+function renderLog(){
+  let h=`<h3 class="h">Case file</h3><table class="dtbl"><tr><th>Case ID</th><td style="font-family:var(--mono)">${esc(S.meta.caseId)}</td><th>Revision</th><td>${S.meta.rev}</td></tr>
+    <tr><th>Created</th><td>${fmt(S.meta.created)} ${esc(S.meta.createdBy)}</td><th>Last saved</th><td>${S.meta.savedAt?fmt(S.meta.savedAt)+" by "+esc(S.meta.savedBy):"—"}</td></tr></table>`;
+  if(S.loops.length){
+    h+=`<h3 class="h">Loop-backs</h3><table class="dtbl"><tr><th>Date</th><th>By</th><th>From → to</th><th>Reason / learning</th></tr>`;
+    S.loops.forEach(l=>h+=`<tr><td>${fmt(l.at)}</td><td>${esc(l.name)} (${rn(l.role)})</td><td>${STAGES[l.from].no} → ${STAGES[l.to].no}</td><td>${esc(l.reason)}</td></tr>`);
+    h+=`</table>`;
+  }
+  h+=`<h3 class="h">Audit trail</h3><table class="dtbl"><tr><th>Date / time</th><th>Name</th><th>Role</th><th>Stage</th><th>Action</th><th>Note</th></tr>`;
+  [...S.log].reverse().forEach(e=>h+=`<tr><td style="white-space:nowrap">${fmt(e.at)}</td><td>${esc(e.name)}</td><td>${rn(e.role)}</td><td>${e.stage?esc(STAGES[e.stage]?.no||e.stage):""}</td><td>${esc(e.action)}</td><td>${esc(e.note)}</td></tr>`);
+  if(!S.log.length) h+=`<tr><td colspan="6" class="small">No entries yet.</td></tr>`;
+  h+=`</table>`;
+  $("#view-log").innerHTML=h;
+}
+function renderAll(){
+  if(!selId) selId=activeId()||"S1";
+  renderHeader(); renderRail(); renderBanner(); renderStage(false);
+  if(view==="flow") $("#flowHost").innerHTML=flowSVG(false);
+  if(view==="check") renderCheck();
+  if(view==="log") renderLog();
+}
+function setView(v){
+  view=v; document.querySelectorAll(".tab").forEach(t=>t.classList.toggle("on",t.dataset.view===v));
+  ["work","flow","check","log"].forEach(k=>$("#view-"+k).hidden = k!==v);
+  renderAll();
+}
+function select(id){ selId=id; setView("work"); window.scrollTo({top:0}); }
+
+/* ================= events: stage editor ================= */
+const RERENDER_KEYS = new Set(["cls","path","verified","allpass","outcome","pkg","reproduced","N_esc","conf","disp","T_img","T_local","T_esc"]);
+$("#stage").addEventListener("input", e=>{
+  const t=e.target; const st=S.stages[selId]; if(!canEdit(selId)) return;
+  if(t.dataset.t){ const f=fieldsFor(selId).find(x=>x.key===t.dataset.t);
+    if(!Array.isArray(st.data[f.key])||!st.data[f.key].length) st.data[f.key]= f.rows?clone(f.rows):[{}];
+    st.data[f.key][+t.dataset.r][t.dataset.c]=t.value; markDirty(); return; }
+  if(t.dataset.ph!==undefined){ st.photos[+t.dataset.ph].caption=t.value; markDirty(); return; }
+  if(t.dataset.k && !["radio","checkbox"].includes(t.type)){ st.data[t.dataset.k]=t.value; t.classList.remove("miss"); markDirty(); if(selId==="S1") renderHeader(); }
+});
+$("#stage").addEventListener("change", e=>{
+  const t=e.target; const st=S.stages[selId]; if(!canEdit(selId)) return;
+  if(t.type==="radio" && t.dataset.k){ st.data[t.dataset.k]=t.value; markDirty(); renderStage(false); renderRail(); return; }
+  if(t.type==="checkbox" && t.dataset.k){
+    if(t.dataset.opt!==undefined){ const a=new Set(st.data[t.dataset.k]||[]); t.checked?a.add(t.dataset.opt):a.delete(t.dataset.opt); st.data[t.dataset.k]=[...a]; }
+    else st.data[t.dataset.k]=t.checked;
+    markDirty(); renderStage(false); return;
+  }
+  if(t.tagName==="SELECT" && t.dataset.k && RERENDER_KEYS.has(t.dataset.k)) renderStage(false);
+});
+document.addEventListener("click", e=>{
+  const t=e.target.closest("[data-sel],[data-act],[data-chk],[data-addrow],[data-delrow],[data-addph],[data-delph],[data-zoom],[data-goto],[data-go],[data-close]");
+  if(t && t.closest("#print-root")) return;
+  if(!t) return;
+  if(t.dataset.close!==undefined){ t.closest("dialog").close(); return; }
+  if(t.dataset.sel){ select(t.dataset.sel); return; }
+  if(t.dataset.goto){ select(t.dataset.goto); return; }
+  if(t.dataset.go){ select(t.dataset.go); return; }
+  const st=S.stages[selId];
+  if(t.dataset.chk){ if(!canEdit(selId)) return; const n=t.dataset.chk; st.checks[n] = st.checks[n]===t.dataset.v ? "" : t.dataset.v; markDirty(); renderStage(false); return; }
+  if(t.dataset.addrow){ const f=fieldsFor(selId).find(x=>x.key===t.dataset.addrow); if(!Array.isArray(st.data[f.key])||!st.data[f.key].length) st.data[f.key]=[{}]; st.data[f.key].push({}); markDirty(); renderStage(false); return; }
+  if(t.dataset.delrow){ const a=st.data[t.dataset.delrow]; if(Array.isArray(a)){ a.splice(+t.dataset.r,1); markDirty(); renderStage(false);} return; }
+  if(t.dataset.addph){ $("#photoIn").click(); return; }
+  if(t.dataset.delph!==undefined){ st.photos.splice(+t.dataset.delph,1); log("Photo removed", selId); markDirty(); renderStage(false); return; }
+  if(t.dataset.zoom!==undefined){ const lb=$("#lightbox"); lb.querySelector("img").src=st.photos[+t.dataset.zoom].data; lb.showModal(); return; }
+  const a=t.dataset.act;
+  if(a==="complete") completeStep(selId);
+  else if(a==="submit") submitGate(selId);
+  else if(a==="approve") approve(selId);
+  else if(a==="reject") reject(selId);
+  else if(a==="reopen") reopen(selId);
+  else if(a==="send") openSend(t.dataset.role);
+  else if(a==="print") $("#dPrint").showModal();
+});
+$("#lightbox").addEventListener("click", ()=>$("#lightbox").close());
+
+/* photos: downscale to keep case files emailable */
+$("#photoIn").addEventListener("change", async e=>{
+  const files=[...e.target.files]; e.target.value=""; const st=S.stages[selId];
+  for(const f of files){
+    try{ const data=await shrink(f,1280,.8); st.photos.push({id:uid(), name:f.name, caption:"", data, by:user.name, at:nowISO()}); }
+    catch(err){ toast("Could not read "+f.name); }
+  }
+  log(`Added ${files.length} photo(s)`, selId); markDirty(); renderStage(false);
+});
+function shrink(file,max,q){
+  return new Promise((res,rej)=>{ const r=new FileReader(); r.onerror=rej; r.onload=()=>{ const im=new Image(); im.onerror=rej; im.onload=()=>{
+    const k=Math.min(1,max/Math.max(im.width,im.height)); const c=document.createElement("canvas"); c.width=Math.round(im.width*k); c.height=Math.round(im.height*k);
+    const x=c.getContext("2d"); x.fillStyle="#fff"; x.fillRect(0,0,c.width,c.height); x.drawImage(im,0,0,c.width,c.height); res(c.toDataURL("image/jpeg",q)); }; im.src=r.result; }; r.readAsDataURL(file); });
+}
+
+/* ================= file save / load / send ================= */
+function fileName(){
+  const s=D("S1"); const part=x=>String(x||"").trim().replace(/[^\w.-]+/g,"-").replace(/^-+|-+$/g,"");
+  return `FA_${part(s.fdc)||"draft"}${s.sn?"_SN"+part(s.sn):""}_r${S.meta.rev}.fa.json`;
+}
+function stamp(action,note){ S.meta.rev++; S.meta.savedAt=nowISO(); S.meta.savedBy=user.name; S.meta.app=APP_VER; log(action,"",note); }
+function blob(){ return new Blob([JSON.stringify(S,null,1)],{type:"application/json"}); }
+function download(){
+  const a=document.createElement("a"); a.href=URL.createObjectURL(blob()); a.download=fileName(); document.body.appendChild(a); a.click();
+  setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); },1500);
+}
+async function saveFile(){
+  stamp("Saved file");
+  if(window.showSaveFilePicker){
+    try{ const h=await showSaveFilePicker({suggestedName:fileName(), types:[{description:"FA case file", accept:{"application/json":[".json"]}}]});
+      const w=await h.createWritable(); await w.write(blob()); await w.close(); done(); return; }
+    catch(e){ if(e.name==="AbortError"){ S.meta.rev--; S.log.pop(); return; } }
+  }
+  download(); done();
+  function done(){ dirty=false; saveDraft(); renderAll(); toast("Saved "+fileName()); }
+}
+function loadCase(obj, name){
+  if(!obj || obj.schema!==SCHEMA || !obj.stages) throw new Error("Not a PCBA FA case file");
+  ORDER.forEach(id=>{ obj.stages[id]=Object.assign(blankStage(), obj.stages[id]||{}); });
+  obj.loops=obj.loops||[]; obj.log=obj.log||[];
+  S=obj; dirty=false; selId=null;
+  // integrity check
+  const bad=ORDER.filter(id=>{ const st=S.stages[id]; return st.status==="complete" && st.signoff && st.signoff.hash && st.signoff.hash!==stageHash(st); });
+  saveDraft(); setView("work");
+  const n=nextAction();
+  toast(bad.length ? `⚠ Loaded, but ${bad.map(i=>STAGES[i].no).join(", ")} changed after signing` : `Opened ${name||"case"} — rev ${S.meta.rev}${n.done?" (closed)":""}`);
+}
+function openFile(file){
+  const r=new FileReader();
+  r.onload=()=>{ try{ loadCase(JSON.parse(r.result), file.name); }catch(e){ toast("Cannot open: "+e.message); } };
+  r.readAsText(file);
+}
+$("#fileIn").addEventListener("change", e=>{ const f=e.target.files[0]; e.target.value=""; if(f) guardDirty(()=>openFile(f)); });
+function guardDirty(fn){
+  if(!dirty) return fn();
+  ask("Unsaved changes", "This case has changes that are not saved to a file. Type DISCARD to continue without saving, or Cancel and use Save first.", "", v=>{ if(v.trim().toUpperCase()!=="DISCARD"){ toast("Type DISCARD to confirm"); return false; } fn(); });
+}
+// drag and drop a case file anywhere
+let dragN=0, ov=null;
+addEventListener("dragenter",e=>{ if(![...e.dataTransfer.types].includes("Files")) return; dragN++; if(!ov){ ov=document.createElement("div"); ov.className="dropov"; ov.textContent="Drop .fa.json case file to open"; document.body.appendChild(ov);} });
+addEventListener("dragleave",()=>{ if(--dragN<=0 && ov){ ov.remove(); ov=null; dragN=0; } });
+addEventListener("dragover",e=>e.preventDefault());
+addEventListener("drop",e=>{ e.preventDefault(); dragN=0; if(ov){ov.remove();ov=null;} const f=e.dataTransfer.files[0]; if(!f) return;
+  if(/\.json$/i.test(f.name)) guardDirty(()=>openFile(f)); else if(f.type.startsWith("image/") && canEdit(selId) && STAGES[selId].photos){ const dt=new DataTransfer(); [...e.dataTransfer.files].forEach(x=>dt.items.add(x)); $("#photoIn").files=dt.files; $("#photoIn").dispatchEvent(new Event("change")); } });
+
+/* send */
+function openSend(role){
+  const n=nextAction(); const sel=$("#sendRole");
+  sel.innerHTML=Object.keys(ROLES).filter(r=>r!=="VIEW").map(r=>`<option value="${r}">${rn(r)}</option>`).join("");
+  sel.value = role || (n.roles&&n.roles[0]) || "QA";
+  $("#sendFile").textContent = fileName().replace(/_r\d+/, "_r"+(S.meta.rev+1));
+  const share = !!(navigator.canShare && navigator.canShare({files:[new File(["x"],"t.json",{type:"application/json"})]}));
+  $("#sendShare").hidden=!share;
+  $("#sendHint").innerHTML = (share?"<b>Share</b> attaches the file directly in Outlook/Mail where your device supports it. ":"")+"<b>Download + email draft</b> saves the file and opens a pre-filled email — attach the downloaded file before sending.";
+  $("#dSend").showModal();
+}
+function sendPrep(){
+  const role=$("#sendRole").value; stamp("Sent to "+rn(role), $("#sendMsg").value.trim()); dirty=false; saveDraft(); renderAll(); return role;
+}
+function mailBody(role){
+  const s=D("S1"), n=nextAction(); const url=/^https?:/.test(location.protocol)?location.href.split("#")[0]:"(your FA app link)";
+  return `Hi,\n\nPCBA FA case ${s.fdc||""} — P/N ${s.pn||"-"}, S/N ${s.sn||"-"} needs your input as ${rn(role)}.\n\nNext action: ${n.text||"-"}\n${$("#sendMsg").value.trim()? "\nNote: "+$("#sendMsg").value.trim()+"\n":""}\nHow to update:\n1. Save the attached file ${fileName()}\n2. Open the FA app: ${url}\n3. Click Open (or drag the file in), choose your role, complete your part, then use "Send to…" for the next person.\n\nSent by ${user.name} (${rn(user.role)})`;
+}
+$("#sendDl").onclick=()=>{ sendPrep(); download(); $("#dSend").close(); toast("Downloaded "+fileName()); };
+$("#sendMail").onclick=()=>{ const role=sendPrep(); download(); const s=D("S1");
+  const subj=`FA ${s.fdc||"case"} S/N ${s.sn||"-"} — action required: ${rn(role)}`;
+  location.href=`mailto:${encodeURIComponent($("#sendTo").value.trim())}?subject=${encodeURIComponent(subj)}&body=${encodeURIComponent(mailBody(role))}`;
+  $("#dSend").close(); toast("Attach "+fileName()+" to the email draft"); };
+$("#sendShare").onclick=async()=>{ const role=sendPrep(); const s=D("S1");
+  const f=new File([blob()], fileName(), {type:"application/json"});
+  try{ await navigator.share({files:[f], title:`FA ${s.fdc||"case"} — ${rn(role)}`, text:mailBody(role)}); $("#dSend").close(); }
+  catch(e){ if(e.name!=="AbortError") toast("Share failed — use Download + email"); } };
+
+/* ================= dialogs ================= */
+let askCb=null;
+function ask(title, prompt, val, cb){ $("#askT").textContent=title; $("#askP").textContent=prompt; $("#askIn").value=val||""; askCb=cb; $("#dAsk").showModal(); setTimeout(()=>$("#askIn").focus(),50); }
+$("#askOk").onclick=()=>{ const r=askCb && askCb($("#askIn").value); if(r!==false) $("#dAsk").close(); };
+
+function openRole(){
+  $("#whoIn").value=user.name||"";
+  let pick=user.role||"";
+  const host=$("#roleCards");
+  host.innerHTML=Object.entries(ROLES).map(([k,r])=>`<button type="button" class="rolec${k===pick?" on":""}" data-role="${k}"><b>${r.name}</b><span>${r.desc}</span></button>`).join("");
+  host.onclick=e=>{ const b=e.target.closest("[data-role]"); if(!b) return; pick=b.dataset.role; host.querySelectorAll(".rolec").forEach(x=>x.classList.toggle("on",x===b)); };
+  $("#roleOk").onclick=()=>{ const nm=$("#whoIn").value.trim(); if(!nm){ toast("Enter your name"); return; } if(!pick){ toast("Choose a role"); return; }
+    const changed = user.role!==pick || user.name!==nm; user={name:nm, role:pick}; lsSet("faw.user", JSON.stringify(user));
+    if(changed && S) { log("Session role: "+rn(pick)); }
+    $("#dRole").close(); renderAll(); };
+  $("#dRole").showModal();
+}
+$("#dRole").addEventListener("cancel", e=>{ if(!user.role) e.preventDefault(); });
+
+/* ================= print ================= */
+function pval(f,v,blank){
+  const box=on=>on?"☒":"☐";
+  if(f.type==="radio"||f.type==="select") return optList(f.options).filter(([a])=>a!=="").map(([a,b])=>`${box(!blank&&v===a)} ${esc(b)}`).join(" &nbsp; ");
+  if(f.type==="checks") return f.options.map(o=>`${box(!blank&&(v||[]).includes(o))} ${esc(o)}`).join(" &nbsp; ");
+  if(f.type==="confirm") return box(!blank&&v)+" Confirmed";
+  if(blank||isEmpty(f,v)) return f.type==="textarea" ? `<div class="blankbox"></div>` : `<span class="blank"></span>`;
+  if(f.type==="datetime-local"||f.type==="date") return esc(v.replace("T"," "));
+  return esc(v).replace(/\n/g,"<br>");
+}
+function ptable(f,v,blank){
+  const rows = !blank&&Array.isArray(v)&&v.length ? v : (f.rows? f.rows : [{},{},{}]);
+  return `<table class="t"><tr><th style="width:6mm">#</th>${f.cols.map(c=>`<th>${esc(c.l)}</th>`).join("")}</tr>${rows.map((r,i)=>`<tr><td>${i+1}</td>${f.cols.map(c=>`<td>${blank&&!c.ro?"&nbsp;":esc(r[c.k]||"")}</td>`).join("")}</tr>`).join("")}</table>`;
+}
+function pfields(fl, d, blank){
+  let h="", rows=[];
+  const flush=()=>{ if(rows.length){ h+=`<table class="t">${rows.join("")}</table>`; rows=[]; } };
+  fl.forEach(f=>{ if(f.type==="table"){ flush(); h+=`<h3>${esc(f.label)}</h3>`+ptable(f,d[f.key],blank); }
+    else rows.push(`<tr><td class="l">${esc(f.label)}${f.req?" *":""}</td><td>${pval(f,d[f.key],blank)}</td></tr>`); });
+  flush(); return h;
+}
+function buildReport(blank, photos){
+  const C = blank ? newCase() : S; const keep=S; S=C;
+  const s1=D("S1"); const n=nextAction();
+  const ident = blank?"":[s1.fdc, s1.pn, s1.sn&&"S/N "+s1.sn].filter(Boolean).join(" · ");
+  const printed = `Printed ${fmt(nowISO())}${user.name?" by "+esc(user.name)+" ("+rn(user.role)+")":""}`;
+  let b="";
+  // cover
+  b+=`<h1>PCBA Failure Analysis Record</h1><div class="meta">${blank?"Blank controlled form — complete one copy per PCBA or investigation":`Case ${esc(S.meta.caseId)} · file rev ${S.meta.rev} · ${n.done?"<b class='ok'>CLOSED</b>":"Status: <b>"+esc(n.text)+"</b>"}`}</div>`;
+  b+=pfields(STAGES.S1.fields.slice(0,12), s1, blank);
+  b+=`<h3>Process status</h3><table class="t"><tr><th>Stage</th><th>Owner / approvers</th><th>Status</th><th>Signed / approved by</th><th>Date</th></tr>`;
+  ORDER.forEach(id=>{ const s=STAGES[id], st=S.stages[id], ds=blank?"":dstat(id);
+    const who = s.kind==="gate" ? Object.values(st.approvals).map(a=>esc(a.name)+" ("+ROLES[a.role].ab+")").join(", ") : (st.signoff?esc(st.signoff.name):"");
+    const cls = ds==="complete"?"ok":ds==="rejected"?"bad":ds==="pending"?"warn":"";
+    b+=`<tr><td><b>${esc(s.no)}</b> ${esc(s.title)}</td><td>${s.kind==="gate"?"Approve: "+s.approvers.map(r=>ROLES[r].ab).join(", "):s.editors.map(r=>ROLES[r].ab).join(", ")}</td><td class="${cls}">${blank?"":STATUS_TXT[ds]}</td><td>${who}</td><td>${st.signoff?fmt(st.signoff.at):""}</td></tr>`; });
+  b+=`</table>`;
+  // flowchart
+  b+=`<div class="pb flowp"><h2>Process flowchart</h2>${flowSVG(blank)}</div>`;
+  // stages
+  ORDER.forEach((id,i)=>{
+    const s=STAGES[id], st=S.stages[id], gate=s.kind==="gate", ds=blank?"":dstat(id);
+    const br=D("S4").cls;
+    b+=`<div class="sect ${i===0?"pb":""}"><div class="psec"><h2 class="${gate?"g":""}">${esc(s.no)} — ${esc(id==="SB"&&br&&!blank?"Branch "+br+": "+BRANCH[br].name:s.title)}${gate?" · HOLD POINT":""}</h2>
+      <div class="guide">${s.guide}</div><div class="meta">Owner: ${s.editors.map(rn).join(" / ")}${gate?" · Approvers: "+s.approvers.map(rn).join(", "):""}${ds?" · Status: <b>"+STATUS_TXT[ds]+"</b>":""}</div></div>`;
+    if(ds==="na"){ b+=`<p class="meta"><i>Not applicable — bypassed by recorded decision.</i></p></div>`; return; }
+    if(id==="SB"){
+      if(br && !blank) b+=pfields(BRANCH[br].fields, st.data, false);
+      else Object.entries(BRANCH).forEach(([k,B])=>{ b+=`<h3>Branch ${k} — ${esc(B.name)} (complete only if selected)</h3>`+pfields(B.fields, st.data, true); });
+    } else b+=pfields(s.fields, st.data, blank);
+    const cl=checksFor(id);
+    if(cl.length){ b+=`<table class="t"><tr><th style="width:9mm">No.</th><th>Check / hold point</th><th>Required evidence</th><th style="width:16mm">Done</th></tr>`;
+      cl.forEach(c=>{ const cs=blank?"":checkState(c); b+=`<tr><td>${c.no}${c.gate?" ("+c.gate+")":""}</td><td>${esc(c.t)}</td><td>${esc(c.ev)}</td><td>${cs==="done"?"☒ Done":cs==="na"?"N/A":"☐"}</td></tr>`; }); b+=`</table>`; }
+    if(photos && !blank && (st.photos||[]).length) b+=`<div class="phg">${st.photos.map(p=>`<figure><img src="${p.data}"><figcaption>${esc(p.caption||p.name)} · ${esc(p.by||"")} ${fmt(p.at)}</figcaption></figure>`).join("")}</div>`;
+    if(gate){
+      b+=`<table class="t"><tr><th>Approval</th><th>Decision</th><th>Name</th><th>Signature / e-sign</th><th>Date</th></tr>`;
+      if(st.submitted && !blank) b+=`<tr><td>Prepared by</td><td>Submitted</td><td>${esc(st.submitted.name)}</td><td>${rn(st.submitted.role)} · #${st.submitted.hash||""}</td><td>${fmt(st.submitted.at)}</td></tr>`;
+      s.approvers.forEach(r=>{ const a=blank?null:st.approvals[r]; b+=`<tr><td><b>${rn(r)}</b></td><td>${a?"<span class='ok'>Approved</span>":"☐ Approve ☐ Reject"}</td><td>${a?esc(a.name):""}</td><td>${a?"e-signed #"+a.hash:""}</td><td>${a?fmt(a.at):""}</td></tr>`; });
+      b+=`</table>`;
+      if(st.lastReject && !blank) b+=`<p class="meta bad">Last rejection: ${esc(st.lastReject.name)} (${rn(st.lastReject.role)}) ${fmt(st.lastReject.at)} — ${esc(st.lastReject.comment)}</p>`;
+    } else {
+      b+=`<table class="t"><tr><td class="l">Completed by (name / role)</td><td>${!blank&&st.signoff?esc(st.signoff.name)+" — "+rn(st.signoff.role):""}</td><td class="l" style="width:14%">Date</td><td style="width:22%">${!blank&&st.signoff?fmt(st.signoff.at):""}</td></tr></table>`;
+    }
+    b+=`</div>`;
+  });
+  // checklist + evidence package
+  b+=`<div class="pb"><h2>PCBA FA checklist — summary</h2><table class="t"><tr><th>No.</th><th>Check / hold point</th><th>Owner</th><th>Gate</th><th>Status</th></tr>`;
+  CHECKS.forEach(c=>{ const cs=blank?"":checkState(c); b+=`<tr><td>${c.no}</td><td>${esc(c.t)}</td><td>${esc(c.ow)}</td><td>${c.gate||""}</td><td>${cs==="done"?"☒ Done":cs==="na"?"N/A":"☐"}</td></tr>`; });
+  b+=`</table><div class="sect"><h2>Minimum evidence and record package</h2><table class="t"><tr><th>Record group</th><th>Minimum content</th><th>Completeness check</th><th>Owner</th><th>Status</th></tr>`;
+  EVPKG.forEach(e=>{ const ok=!blank&&e.st.every(id=>["complete","na"].includes(eff(id))); b+=`<tr><td><b>${esc(e.g)}</b></td><td>${esc(e.c)}</td><td>${esc(e.k)}</td><td>${esc(e.ow)}</td><td>${blank?"☐":ok?"☒ Complete":"Open"}</td></tr>`; });
+  b+=`</table></div></div>`;
+  if(!blank){
+    if(S.loops.length){ b+=`<div class="sect"><h2>Loop-back history</h2><table class="t"><tr><th>Date</th><th>By</th><th>From → to</th><th>Reason</th></tr>${S.loops.map(l=>`<tr><td>${fmt(l.at)}</td><td>${esc(l.name)} (${rn(l.role)})</td><td>${STAGES[l.from].no} → ${STAGES[l.to].no}</td><td>${esc(l.reason)}</td></tr>`).join("")}</table></div>`; }
+    b+=`<div class="sect"><h2>Audit trail</h2><table class="t"><tr><th>Date / time</th><th>Name</th><th>Role</th><th>Stage</th><th>Action</th><th>Note</th></tr>${S.log.map(e=>`<tr><td>${fmt(e.at)}</td><td>${esc(e.name)}</td><td>${rn(e.role)}</td><td>${e.stage?esc(STAGES[e.stage]?.no||""):""}</td><td>${esc(e.action)}</td><td>${esc(e.note)}</td></tr>`).join("")}</table></div>`;
+  }
+  b+=`<div class="note"><b>Control note:</b> This template is decision support, not a controlled test or repair procedure. Add approved procedure numbers, limits, acceptance criteria and document-control fields before operational release. Electronic sign-offs record name, role, time and a content fingerprint (#); replace with an approved electronic-signature workflow where required.</div>`;
+  S=keep;
+  return `<table class="wrap"><thead><tr><td><div class="ph-h"><b>PCBA FAILURE ANALYSIS</b><span>${esc(ident)}</span></div></td></tr></thead>
+    <tfoot><tr><td><div class="ph-f"><span>Owner: ______________ &nbsp; Rev: ____ &nbsp; Controlled-process approval required before operational release.</span><span>${printed}</span></div></td></tr></tfoot>
+    <tbody><tr><td>${b}</td></tr></tbody></table>`;
+}
+function doPrint(blank, photos){ $("#print-root").innerHTML=buildReport(blank, photos);
+  if(!blank){ /* record print in history without making file dirty-critical */ }
+  setTimeout(()=>window.print(),60); }
+$("#printGo").onclick=()=>{ const m=document.querySelector('input[name="pmode"]:checked').value; $("#dPrint").close(); doPrint(m==="blank", $("#pPhotos").checked); };
+addEventListener("beforeprint", ()=>{ if(!$("#print-root").innerHTML) $("#print-root").innerHTML=buildReport(false,true); });
+addEventListener("afterprint", ()=>{ $("#print-root").innerHTML=""; });
+
+/* ================= top bar ================= */
+$("#bNew").onclick=()=>guardDirty(()=>{ S=newCase(); log("Case created"); dirty=false; selId="S1"; saveDraft(); setView("work"); toast("New case started"); });
+$("#bOpen").onclick=()=>$("#fileIn").click();
+$("#bSave").onclick=saveFile;
+$("#bSend").onclick=()=>openSend();
+$("#bPrint").onclick=()=>$("#dPrint").showModal();
+$("#bWho").onclick=openRole;
+$("#tabs").onclick=e=>{ const t=e.target.closest(".tab"); if(t) setView(t.dataset.view); };
+addEventListener("beforeunload", e=>{ if(dirty){ e.preventDefault(); e.returnValue=""; } });
+addEventListener("keydown", e=>{ if((e.ctrlKey||e.metaKey) && e.key.toLowerCase()==="s"){ e.preventDefault(); saveFile(); } });
+
+/* ================= boot ================= */
+(function boot(){
+  let restored=false;
+  try{ const d=JSON.parse(lsGet("faw.draft")||"null"); if(d && d.S && d.S.schema===SCHEMA){ S=d.S; ORDER.forEach(id=>S.stages[id]=Object.assign(blankStage(),S.stages[id]||{})); dirty=!!d.dirty; restored=true; } }catch(e){}
+  if(!S){ S=newCase(); }
+  setView("work");
+  if(restored && dirty) toast("Restored your unsaved work from this browser");
+  if(!user.role) openRole();
+})();
+</script>
+</body>
+</html>
