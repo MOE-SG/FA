@@ -160,6 +160,21 @@ textarea.inp{min-height:68px;resize:vertical}
 .infobox{border:1px solid #bcd0f1;background:var(--accent-bg);color:#123c7a;border-radius:6px;padding:9px 12px;font-size:13px;margin-bottom:12px}
 .loopbox{border:1px solid #f1d39b;background:var(--warn-bg);color:#5a3800;border-radius:6px;padding:9px 12px;font-size:13px;margin-bottom:12px}
 
+#tip{position:fixed;z-index:200;max-width:380px;background:#13213b;color:#e9eef7;border-radius:8px;padding:12px 14px;font-size:12.8px;line-height:1.45;box-shadow:0 12px 32px rgba(10,20,40,.35);pointer-events:none;opacity:0;transition:opacity .12s}
+#tip.show{opacity:1}
+#tip .tt{display:block;color:#fff;font-size:13.5px;margin-bottom:6px}
+#tip span{display:block;font:700 10px var(--sans);letter-spacing:.08em;text-transform:uppercase;color:#8fb3ec;margin-top:6px}
+#tip .tr span{color:#f2a19b}
+#tip ul{margin:2px 0 0;padding-left:16px}
+#tip li{margin:2px 0}
+.why{margin:0;border-bottom:1px solid var(--line2);background:#fffdf6}
+.why summary{cursor:pointer;padding:9px 18px;font-weight:600;font-size:13px;color:#6a4b00;list-style:none}
+.why summary::-webkit-details-marker{display:none}
+.why summary:before{content:"ⓘ  "}
+.why .wb{padding:0 18px 12px;font-size:13.2px;color:var(--ink2)}
+.why .wb ul{margin:4px 0;padding-left:18px}
+.why .wb .risk{color:var(--bad);font-size:12.8px}
+.infoi{display:inline-grid;place-items:center;width:16px;height:16px;border-radius:50%;border:1px solid #9aa3b2;font:700 10px var(--sans);color:#6b7487;margin-left:4px;vertical-align:1px;cursor:help}
 /* ---------- other views ---------- */
 .pane{max-width:1100px;margin:0 auto;padding:16px}
 .flowwrap{display:grid;grid-template-columns:minmax(0,1fr) 260px;gap:16px;align-items:start}
@@ -291,7 +306,7 @@ dialog::backdrop{background:rgba(15,25,45,.5)}
         <div class="lg">▭ Work step (one owner signs)</div>
         <div class="lg" style="color:#b3261e">⬡ Hold point — multi-role approval</div>
         <div class="lg">◇ Decision recorded in the step above</div>
-        <p class="small" style="margin:12px 0 0">Click any box to open that stage. Dashed return lines are the loop-backs: a failed mechanism check returns to hypotheses; a failed verification returns to localization.</p>
+        <p class="small" style="margin:12px 0 0"><b>Hover</b> any box for its purpose and why it matters. Click to open that stage. Dashed return lines are the loop-backs: a failed mechanism check returns to hypotheses; a failed verification returns to localization.</p>
       </div>
     </div>
   </section>
@@ -303,6 +318,7 @@ dialog::backdrop{background:rgba(15,25,45,.5)}
 <input type="file" id="fileIn" accept=".json,application/json" hidden>
 <input type="file" id="photoIn" accept="image/*" multiple hidden>
 <div id="toast"></div>
+<div id="tip" role="tooltip"></div>
 
 <!-- role dialog -->
 <dialog id="dRole"><div class="dlg">
@@ -433,7 +449,7 @@ const STAGES = {
       F("expected","Expected result","textarea"), F("actual","Actual result","textarea",{req:1}),
       F("raw","Native raw data file location(s)","text",{req:1,span:2}),
       F("reproduced","Failure reproduced?","radio",{req:1,span:2,options:[["yes","Yes — consistently"],["some","Sometimes"],["no","No"]]}),
-      F("cls","Behavior classification (selects branch)","radio",{req:1,span:2,options:[["R","R — Repeatable at PCBA level"],["T","T — Heat or soak dependent"],["I","I — Intermittent / handling sensitive"],["N","N — No fault found at PCBA level"]]}),
+      F("cls","Behavior classification (selects branch)","radio",{req:1,span:2,options:[["R","R — Repeatable at PCBA level"],["I","I — Intermittent / handling sensitive"],["N","N — No fault found at PCBA level"],["D","D — Dependent on heat or soak"]]}),
       F("freq","Frequency of occurrence"), F("det","Detection level","select",{req:1,options:["","PCBA","Insert","Tool","Field"]})
     ]},
   SB:{kind:"branch", no:"Branch", title:"Failure-behavior branch", short:"Branch work", editors:["ENG","TEST"], photos:true,
@@ -528,12 +544,12 @@ const BRANCH = {
      fields:[F("R_short","Shortest repeatable test","text",{req:1}), F("R_kg","Known-good control ID (matching HW/FW)","text",{req:1}),
        F("R_meas","Measurements captured","checks",{span:2,options:["Input current","Power rails","Reset & clock","MCU / flash behavior","Communications","Drivers / I/O","Analogue / sensor"]}),
        F("R_cmp","Side-by-side comparison vs known-good","textarea",{req:1,span:2})]},
-  T:{name:"Heat or soak dependent", guide:"Use only approved thermal conditions and limits. Log current, rails, communications and reset continuously. Use thermal imaging and controlled local heating/cooling only when authorized. Escalate to representative insert-level heat testing if the PCBA fixture cannot reproduce the actual load or mechanics.",
-     fields:[F("T_ok","Thermal conditions and limits are within the Gate A approval","confirm",{req:1,span:2}),
-       F("T_prof","Thermal profile / limits used","text",{req:1}), F("T_log","Continuous log reference (current, rails, comms, reset)","text",{req:1}),
-       F("T_img","Thermal imaging","radio",{options:[["used","Used"],["not","Not used"]]}), F("T_local","Controlled local heating / cooling","radio",{options:[["auth","Performed (authorized)"],["not","Not performed"]]}),
-       F("T_kg","Known-good control ID (if used)"), F("T_esc","Insert-level heat test escalation","radio",{options:[["no","Not required"],["yes","Escalated"]]}),
-       F("T_obs","Observations (onset temperature, soak time to failure, recovery)","textarea",{req:1,span:2})]},
+  D:{name:"Heat or soak dependent", guide:"Use only approved thermal conditions and limits. Log current, rails, communications and reset continuously. Use thermal imaging and controlled local heating/cooling only when authorized. Escalate to representative insert-level heat testing if the PCBA fixture cannot reproduce the actual load or mechanics.",
+     fields:[F("D_ok","Thermal conditions and limits are within the Gate A approval","confirm",{req:1,span:2}),
+       F("D_prof","Thermal profile / limits used","text",{req:1}), F("D_log","Continuous log reference (current, rails, comms, reset)","text",{req:1}),
+       F("D_img","Thermal imaging","radio",{options:[["used","Used"],["not","Not used"]]}), F("D_local","Controlled local heating / cooling","radio",{options:[["auth","Performed (authorized)"],["not","Not performed"]]}),
+       F("D_kg","Known-good control ID (if used)"), F("D_esc","Insert-level heat test escalation","radio",{options:[["no","Not required"],["yes","Escalated"]]}),
+       F("D_obs","Observations (onset temperature, soak time to failure, recovery)","textarea",{req:1,span:2})]},
   I:{name:"Intermittent or handling sensitive", guide:"Preserve the as-received condition and monitor continuously. Perform only approved connector/harness checks. Investigate pins, connectors, solder joints, vias, inner-layer continuity, pads, component damage, PCB flex and installation/removal stress. Record each stimulus and response.",
      fields:[F("I_mon","Continuous monitoring method","text",{req:1}), F("I_kg","Known-good control ID (if used)"),
        F("I_areas","Areas investigated","checks",{span:2,options:["Pins","Connectors","Solder joints","Vias","Inner-layer continuity","Pads","Component damage","PCB flex","Installation / removal stress"]}),
@@ -547,6 +563,7 @@ const BRANCH = {
        F("outcome","Outcome","radio",{req:1,span:2,options:[["found","Fault reproduced at higher level → continue to Step 5 localization"],["nff","Still no fault found → skip localization, go to Step 6"]]})]}
 };
 
+const BR_ORDER=["R","I","N","D"];
 /* 24-item checklist (pages 4–5 of template) */
 const CHECKS = [
   {no:1, st:"S1", t:"Confirm identity, revision, configuration and symptom.", ev:"FDC/RQF; SAP/build history; PCBA, insert/tool and firmware records.", ow:"FA / Quality"},
@@ -557,7 +574,7 @@ const CHECKS = [
   {no:6, st:"GA", t:"Verify equipment, fixture and calibration.", ev:"Equipment ID, calibration due date, fixture/simulator revision and software.", ow:"Test"},
   {no:7, st:"GA", t:"Approve diagnostic test plan.", ev:"Scope, limits, stop criteria, risks and approval signatures.", ow:"Test / Quality", gate:"A", auto:1},
   {no:8, st:"S4", t:"Reproduce failure using reported configuration.", ev:"Native data, expected/actual, environment, setup photo and operator/date/time.", ow:"Test"},
-  {no:9, st:"S4", t:"Classify behavior and detection level.", ev:"R/T/I/N branch, frequency and PCBA/insert/tool/field detection level.", ow:"FA owner"},
+  {no:9, st:"S4", t:"Classify behavior and detection level.", ev:"R/I/N/D branch, frequency and PCBA/insert/tool/field detection level.", ow:"FA owner"},
   {no:10,st:"SB", t:"Compare with known-good control.", ev:"Control identity, matching setup and side-by-side measurements.", ow:"Engineering"},
   {no:11,st:"S5", t:"Localize functional block.", ev:"Current, rails, reset/clock, communications, memory, I/O and suspect nets.", ow:"Engineering"},
   {no:12,st:"SB", t:"For NFF, verify test equivalence.", ev:"Actual vs simulated load, mechanics, firmware, temperature, soak and duty cycle.", ow:"Test / Eng.", nffOnly:1},
@@ -603,6 +620,135 @@ const stageHash = st => fnv(stable({d:st.data, c:st.checks, p:(st.photos||[]).ma
 function lsGet(k){ try{ return localStorage.getItem(k); }catch(e){ return null; } }
 function lsSet(k,v){ try{ localStorage.setItem(k,v); }catch(e){} }
 function toast(m){ const t=$("#toast"); t.textContent=m; t.classList.add("show"); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove("show"),3200); }
+
+/* Purpose and "why it matters" text, shown on hover and in each stage card */
+const WHY = {
+  S1:{t:"Step 1 · Intake and identification",
+    p:"Pin down exactly which unit you are investigating and what was actually reported.",
+    w:["The wrong S/N, revision or firmware means you test against the wrong drawing, limits or test program.",
+       "Field reports are often paraphrased. Recording the original symptom and failure parameters keeps the investigation aimed at the real complaint.",
+       "Repair history, operating hours and site help you spot repeat offenders, ageing and population trends."],
+    r:"You investigate the wrong part, revision or symptom, and the conclusion cannot be traced."},
+  S2:{t:"Step 2 · Contain and preserve",
+    p:"Stop more suspect product escaping, and freeze the evidence on this unit.",
+    w:["If the cause is lot- or process-related, sister units may be in stock, in WIP or already in the field.",
+       "Cleaning, reseating a connector, reflashing firmware or a quick swap can make the fault disappear: an intermittent contact heals or contamination is wiped away.",
+       "Chain of custody makes the findings defensible to the customer, the supplier and auditors."],
+    r:"More bad units ship, and the original failure evidence is lost before anyone looks at it."},
+  S3:{t:"Step 3 · As-received evidence",
+    p:"Record the unit exactly as it arrived, before anyone touches it.",
+    w:["The unit may not be as described: wrong unit, wrong revision, missing parts or labels.",
+       "It may have been damaged or altered during shipping, removal from the tool, or by field troubleshooting and previous rework.",
+       "Timestamped photos separate damage that came in from damage caused during the FA.",
+       "Visual clues (cracked joints, burnt parts, contamination, flex) often point straight to the mechanism."],
+    r:"You can't later prove whether damage was pre-existing or caused by the lab."},
+  GA:{t:"Gate A · Diagnostic test authorization (HOLD POINT)",
+    p:"Agree a safe, valid test plan before the unit is powered, stressed or reconfigured.",
+    w:["Powering a damaged board can destroy the evidence: a short burns open, a marginal joint fails, and secondary damage hides the root cause.",
+       "Testing outside approved limits can overstress good parts and create new failures.",
+       "An out-of-calibration instrument, wrong fixture or wrong firmware produces a false pass or fail.",
+       "Stop criteria tell the operator when to stop before the unit is harmed. Test and Quality sign so the results are both safe and valid."],
+    r:"Evidence is destroyed on first power-up, or the test result is meaningless."},
+  S4:{t:"Step 4 · Reproduce the reported failure",
+    p:"Confirm the failure is real and observable under controlled, recorded conditions.",
+    w:["The symptom may come from the insert, tool, cable or software, not the PCBA.",
+       "Start with the reported configuration, so you reproduce the customer's failure rather than a new one.",
+       "Native raw data is the 'before' evidence that Step 9 needs to prove the fix.",
+       "How it fails (R/I/N/D) decides the investigation branch."],
+    r:"You fix a problem the unit never had, or miss the one it does have."},
+  SB:{t:"Branch · Failure-behaviour checks",
+    p:"Use the investigation method that matches how the failure behaves.",
+    w:["Repeatable, Intermittent, No-fault-found and heat/soak Dependent failures need different techniques.",
+       "Pick R, I, N or D in Step 4. All branches merge at Step 5."],
+    r:"Using the wrong method wastes time and can erase intermittent or thermal evidence."},
+  B_R:{t:"R · Repeatable at PCBA level",
+    p:"Fails every time on the bench, so this is the fastest path to root cause.",
+    w:["Use the shortest test that triggers the failure, to limit stress on the unit.",
+       "Compare side by side with a known-good board on the same hardware and firmware. The difference is your clue."]},
+  B_I:{t:"I · Intermittent or handling sensitive",
+    p:"Comes and goes, often when the board is touched, flexed or vibrated.",
+    w:["Usually an interconnect: cracked solder joint, connector, via, inner layer or pad.",
+       "Every touch can change or 'heal' it, so monitor continuously and log each stimulus and response.",
+       "Only approved connector and harness checks, so the defect isn't disturbed."]},
+  B_N:{t:"N · No fault found at PCBA level",
+    p:"The bench test doesn't show the failure. Don't close it yet.",
+    w:["The PCBA test may not represent real use: load, latch, connectors, firmware, temperature, soak or duty cycle may differ.",
+       "NFF closures are a common source of repeat field failures and returns.",
+       "Check test equivalence, loop the test, then escalate to insert- or tool-level testing."]},
+  B_D:{t:"D · Dependent on heat or soak",
+    p:"Fails only at temperature, or after time at temperature.",
+    w:["Thermal expansion opens cracked joints and vias; components drift or leak at elevated temperature.",
+       "Stay within the Gate A thermal limits. Log current, rails, comms and reset continuously.",
+       "If the fixture can't reproduce real load or mechanics, escalate to insert-level heat testing."]},
+  S5:{t:"Step 5 · Localize the failing function",
+    p:"Narrow down from the system symptom to a block, circuit, net and suspect item.",
+    w:["Avoids shotgun part replacement, which destroys evidence and rarely proves anything.",
+       "Logging purpose, expected, actual and next decision for each check lets a reviewer follow and challenge the logic.",
+       "Capture the evidence before any substitution or rework."],
+    r:"Parts get replaced on guesswork and the true cause stays hidden."},
+  S6:{t:"Step 6 · Form and rank cause hypotheses",
+    p:"Separate what is proven from what is suspected, then rank the candidates.",
+    w:["Guards against locking onto the first idea (confirmation bias).",
+       "Includes the test fixture, the measurement and firmware: the 'failure' may be in the test setup.",
+       "Ranking decides the next evidence-altering action, and whether one is needed at all."],
+    r:"The team argues opinions instead of evidence, and the wrong part is removed."},
+  GB:{t:"Gate B · Rework or destructive FA authorization (HOLD POINT)",
+    p:"Approve any action that permanently changes or destroys evidence.",
+    w:["Removal, reflow, depopulation and cross-section can't be undone. Once done, the original evidence is gone.",
+       "An approved method stops the action itself causing damage (overheated pads, lifted traces) that gets mistaken for the root cause.",
+       "A sample-retention plan keeps parts available for supplier FA, warranty claims or a second opinion."],
+    r:"Irreplaceable evidence is lost, and the action may create new defects."},
+  S7:{t:"Step 7 · Capture pre-action evidence",
+    p:"Last chance to record the unaltered failure before the corrective action.",
+    w:["These measurements, waveforms and images are the 'before' half of the proof in Step 9.",
+       "Suppliers and customers usually ask for this data before they accept a claim.",
+       "Tag every file to the S/N and FA record so it can be found and trusted later."],
+    r:"There is no proof the fault existed once the board is reworked."},
+  S8:{t:"Step 8 · Apply controlled corrective action",
+    p:"Carry out exactly the approved action, with full traceability.",
+    w:["The replacement part's lot and date code matter: a new part from the same bad lot can fail the same way.",
+       "Process parameters and before/after photos show the rework was done to standard.",
+       "The removed part is evidence. Inspect and retain it for independent testing or supplier return."],
+    r:"You can't tell whether a later failure is the original issue or the repair."},
+  S9:{t:"Step 9 · Verify the failure mechanism",
+    p:"Prove the cause, not just that the board now works.",
+    w:["Rework can 'fix' a board by accident: reflow heals a neighbouring cracked joint, or reseating cleans a contact.",
+       "Show the fault before the action, its absence after under the same conditions, and test the removed part on its own where possible.",
+       "If the mechanism isn't demonstrated, go back to Step 6. Don't call it root cause."],
+    r:"A false root cause is reported, the CAPA fixes the wrong thing, and failures recur."},
+  S10:{t:"Step 10 · Representative verification",
+    p:"Confirm the unit works at the level it is actually used.",
+    w:["A PCBA bench pass doesn't guarantee an insert or tool pass: loads, mechanics and thermal profile differ.",
+       "Repeat the original failing test under the original conditions first.",
+       "Confirm the firmware and configuration are back to the released state."],
+    r:"The unit passes in the lab but fails again downhole or at the customer."},
+  GC:{t:"Gate C · Disposition and release (HOLD POINT)",
+    p:"Decide what happens to this unit and to any affected population.",
+    w:["State an honest confidence level: Confirmed, Probable or NFF. Each carries different risk.",
+       "The affected scope (serials, lots, dates, rework history) protects the other units.",
+       "Engineering, Quality, Test and Manufacturing agree the residual risk and any deviation before release."],
+    r:"Suspect product is released, or good product is scrapped without reason."},
+  S11:{t:"Step 11 · Trend and feedback",
+    p:"Make the learning stick so the failure doesn't come back.",
+    w:["Trending across cases reveals repeat failure modes that a single FA can't see.",
+       "RCCA/CAPA, PFMEA, control-plan, work-instruction and test-coverage updates prevent recurrence or improve detection.",
+       "An owner, a due date and effectiveness evidence prove the action actually worked."],
+    r:"The same failure is analysed again next quarter."},
+  Q1:{t:"Decision · Classify behaviour",
+    p:"How does the failure show up? Remember it as R-I-N-D.",
+    w:["R: Repeatable, fails every time.","I: Intermittent, comes and goes or is handling sensitive.","N: No fault found at PCBA level.","D: Dependent on heat or soak."]},
+  Q2:{t:"Decision · Evidence-altering action needed?",
+    p:"Does proving the cause need rework, part removal or destructive analysis?",
+    w:["Yes: go to Gate B approval first.","No (e.g. NFF, a fixture or test-setup issue): skip to Step 10 verification."]},
+  Q3:{t:"Decision · Mechanism verified?",
+    p:"Has Step 9 demonstrated the cause, not just restored function?",
+    w:["Yes: go on to representative verification.","No: loop back to Step 6 and revise the hypotheses. The learning is logged."]},
+  Q4:{t:"Decision · All verification passed?",
+    p:"Did every applicable test pass under representative conditions?",
+    w:["Yes: go to Gate C disposition.","No: loop back to Step 5. The fix didn't address the real failing function."]}
+};
+function tipHTML(k){ const x=WHY[k]; if(!x) return "";
+  return `<b class="tt">${esc(x.t)}</b><div class="tp"><span>Purpose</span>${esc(x.p)}</div><span class="tl">Why it matters</span><ul>${x.w.map(i=>`<li>${esc(i)}</li>`).join("")}</ul>${x.r?`<div class="tr"><span>If skipped</span>${esc(x.r)}</div>`:""}`; }
 
 /* ================= state ================= */
 let user = {name:"", role:""};
@@ -760,7 +906,7 @@ function renderRail(){
     const s=STAGES[id], ds=dstat(id);
     const title = id==="SB" && D("S4").cls ? `Branch ${D("S4").cls} — ${BRANCH[D("S4").cls].name}` : s.title;
     const roles = s.kind==="gate" ? "Approve: "+s.approvers.map(r=>ROLES[r].ab).join(" · ") : s.editors.map(r=>ROLES[r].ab).join(" · ");
-    h+=`<div class="ri st-${ds} ${s.kind==="gate"?"gate":""} ${id===selId?"sel":""}" data-sel="${id}">
+    h+=`<div class="ri st-${ds} ${s.kind==="gate"?"gate":""} ${id===selId?"sel":""}" data-sel="${id}" data-tip="${id==="SB"&&D("S4").cls?"B_"+D("S4").cls:id}">
       <span class="dot"></span><div><div class="k">${esc(s.no)}${s.kind==="gate"?" · HOLD":""}</div><div class="t">${esc(title)}</div><div class="o">${roles} — ${STATUS_TXT[ds]}</div></div></div>`;
   });
   $("#rail").innerHTML=h;
@@ -794,7 +940,7 @@ function renderField(f, v, ed, showMiss){
   switch(f.type){
     case "textarea": return `<div class="${cls}"><label for="${id}">${lab}</label><textarea class="inp${miss}" id="${id}" data-k="${f.key}"${dis}>${esc(v)}</textarea></div>`;
     case "select": return `<div class="${cls}"><label for="${id}">${lab}</label><select class="inp${miss}" id="${id}" data-k="${f.key}"${dis}>${optList(f.options).map(([a,b])=>`<option value="${esc(a)}"${a===(v||"")?" selected":""}>${esc(b||"— select —")}</option>`).join("")}</select></div>`;
-    case "radio": return `<div class="${cls}"><span class="lab">${lab}</span><div class="opts${miss?" missbox":""}" ${miss?'style="outline:1px solid var(--bad);outline-offset:3px;border-radius:5px"':""}>${optList(f.options).map(([a,b])=>`<label class="opt${v===a?" on":""}${ed?"":" dis"}"><input type="radio" name="${f.key}" data-k="${f.key}" value="${esc(a)}"${v===a?" checked":""}${dis}>${esc(b)}</label>`).join("")}</div></div>`;
+    case "radio": return `<div class="${cls}"><span class="lab">${lab}${f.key==="cls"?' <span class="infoi" data-tip="Q1">i</span>':""}</span><div class="opts${miss?" missbox":""}" ${miss?'style="outline:1px solid var(--bad);outline-offset:3px;border-radius:5px"':""}>${optList(f.options).map(([a,b])=>`<label class="opt${v===a?" on":""}${ed?"":" dis"}"${f.key==="cls"?` data-tip="B_${a}"`:""}><input type="radio" name="${f.key}" data-k="${f.key}" value="${esc(a)}"${v===a?" checked":""}${dis}>${esc(b)}</label>`).join("")}</div></div>`;
     case "checks": { const arr=v||[]; return `<div class="${cls}"><span class="lab">${lab}</span><div class="opts">${f.options.map(o=>`<label class="opt${arr.includes(o)?" on":""}${ed?"":" dis"}"><input type="checkbox" data-k="${f.key}" data-opt="${esc(o)}"${arr.includes(o)?" checked":""}${dis}>${esc(o)}</label>`).join("")}</div></div>`; }
     case "confirm": return `<div class="${cls}"><label class="confirm${v?" on":""}" ${miss?'style="border-color:var(--bad)"':""}><input type="checkbox" data-k="${f.key}"${v?" checked":""}${dis}><span>${lab}</span></label></div>`;
     case "table": {
@@ -831,7 +977,10 @@ function renderStage(showMiss){
     <div class="meta">${gate?"Prepared by: ":"Owner: "}${s.editors.map(r=>`<span class="chip${r===user.role?" me":""}">${rn(r)}</span>`).join("")}
     ${gate?" &nbsp;Approvers: "+s.approvers.map(r=>`<span class="chip${r===user.role?" me":""}">${rn(r)}</span>`).join(""):""}</div></div>
     <div style="text-align:right">${iter?`<span class="pill pending" style="margin-right:6px">Iteration ${iter+1}</span>`:""}<span class="pill ${ds}">${STATUS_TXT[ds]}</span></div></div>`;
-  h+=`<div class="guide">${s.guide}${id==="SB"&&branch?"<br><br><b>Branch "+branch+":</b> "+BRANCH[branch].guide:""}</div><div class="sbody">`;
+  h+=`<div class="guide">${s.guide}${id==="SB"&&branch?"<br><br><b>Branch "+branch+":</b> "+BRANCH[branch].guide:""}</div>`;
+  { const wk = id==="SB"&&branch ? "B_"+branch : id, x=WHY[wk];
+    if(x) h+=`<details class="why"${lsGet("faw.whyClosed")?"":" open"}><summary>Purpose — ${esc(x.p)}</summary><div class="wb"><ul>${x.w.map(i=>`<li>${esc(i)}</li>`).join("")}</ul>${x.r?`<div class="risk"><b>If skipped:</b> ${esc(x.r)}</div>`:""}</div></details>`; }
+  h+=`<div class="sbody">`;
 
   // notices
   if(ds==="locked") h+=`<div class="infobox">This stage opens after the earlier stages are complete. You can view it, but not edit it yet.</div>`;
@@ -914,7 +1063,7 @@ function flowSVG(neutral){
   const roles = id => STAGES[id].editors.map(r=>ROLES[r].ab).join(" · ");
   function box(id,y){
     const s=ST(id), [f,st,tx]=P[s], x=CX-150, w=300, h=50, na=s==="na";
-    return `<g data-go="${id}"><rect x="${x}" y="${y}" width="${w}" height="${h}" rx="6" fill="${f}" stroke="${st}" stroke-width="${s==="active"?2.6:1.6}" ${na?'stroke-dasharray="5 4"':""}/>
+    return `<g data-go="${id}" data-tip="${id}"><rect x="${x}" y="${y}" width="${w}" height="${h}" rx="6" fill="${f}" stroke="${st}" stroke-width="${s==="active"?2.6:1.6}" ${na?'stroke-dasharray="5 4"':""}/>
       ${T(x+14,y+19,STAGES[id].no.toUpperCase(),`font-size="10" font-weight="700" letter-spacing="1" fill="${s==="neutral"?"#6b7487":st}"`)}
       ${T(x+w-12,y+19,roles(id),`font-size="10" fill="#6b7487" text-anchor="end"`)}
       ${T(x+14,y+38,STAGES[id].short,`font-size="14.5" font-weight="700" fill="${tx}" ${na?'text-decoration="line-through"':""}`)}
@@ -923,15 +1072,15 @@ function flowSVG(neutral){
   function hex(id,y){
     const s=ST(id), [f,st,tx]=P[s], x=CX-165, w=330, h=60, na=s==="na";
     const pts=[[x,y+h/2],[x+18,y],[x+w-18,y],[x+w,y+h/2],[x+w-18,y+h],[x+18,y+h]].map(p=>p.join(",")).join(" ");
-    return `<g data-go="${id}"><polygon points="${pts}" fill="${f}" stroke="${s==="neutral"||s==="locked"?"#b3261e":st}" stroke-width="${s==="active"?2.6:1.8}" ${na?'stroke-dasharray="5 4"':""}/>
+    return `<g data-go="${id}" data-tip="${id}"><polygon points="${pts}" fill="${f}" stroke="${s==="neutral"||s==="locked"?"#b3261e":st}" stroke-width="${s==="active"?2.6:1.8}" ${na?'stroke-dasharray="5 4"':""}/>
       ${T(x+30,y+19,STAGES[id].no.toUpperCase()+" · HOLD POINT",`font-size="10" font-weight="700" letter-spacing="1" fill="#b3261e"`)}
       ${T(x+30,y+37,STAGES[id].short,`font-size="14" font-weight="700" fill="${tx}" ${na?'text-decoration="line-through"':""}`)}
       ${T(x+30,y+51,"Approve: "+STAGES[id].approvers.map(r=>ROLES[r].ab).join(" · "),`font-size="9.5" fill="#6b7487"`)}
       ${TAG[s]?T(x+w-30,y+19,TAG[s],`font-size="9.5" font-weight="700" fill="${st}" text-anchor="end"`):""}</g>`;
   }
-  function dia(go,y,l1,l2){
+  function dia(go,y,l1,l2,tk){
     const s=ST(go), done = s==="complete"; const st = neutral?"#13213b":(done?"#1e7b4f":"#56627a"); const f= done&&!neutral?"#f3faf6":"#ffffff";
-    return `<g data-go="${go}"><polygon points="${CX},${y} ${CX+135},${y+42} ${CX},${y+84} ${CX-135},${y+42}" fill="${f}" stroke="${st}" stroke-width="1.6"/>
+    return `<g data-go="${go}" data-tip="${tk}"><polygon points="${CX},${y} ${CX+135},${y+42} ${CX},${y+84} ${CX-135},${y+42}" fill="${f}" stroke="${st}" stroke-width="1.6"/>
       ${T(CX,y+39,l1,`font-size="12.5" font-weight="700" fill="#13213b" text-anchor="middle"`)}${T(CX,y+55,l2,`font-size="12.5" font-weight="700" fill="#13213b" text-anchor="middle"`)}</g>`;
   }
   function term(y,t){ return `<rect x="${CX-110}" y="${y}" width="220" height="34" rx="17" fill="#13213b"/>${T(CX,y+22,t,`font-size="13" font-weight="700" fill="#fff" text-anchor="middle"`)}`; }
@@ -945,38 +1094,38 @@ function flowSVG(neutral){
   g+=hex("GA",294); g+=T(CX+175,328,"Reject → revise plan",'font-size="10" fill="#b3261e" font-style="italic"');
   g+=arrow(`M${CX} 354 V376`);
   g+=box("S4",378); g+=arrow(`M${CX} 428 V450`);
-  g+=dia("S4",452,"Classify observed","behaviour (R/T/I/N)");
+  g+=dia("S4",452,"Classify observed","behaviour (R/I/N/D)","Q1");
   // branches
   const bw=146, gap=8, bx0=16, by=566; const cls=D("S4").cls; const sbS=ST("SB");
   const centers=[0,1,2,3].map(i=>bx0+i*(bw+gap)+bw/2);
   g+=line(`M${CX} 536 V550`); g+=line(`M${centers[0]} 550 H${centers[3]}`);
-  const BL=[["R","Repeatable","at PCBA level"],["T","Heat or soak","dependent"],["I","Intermittent /","handling sensitive"],["N","No fault found","at PCBA level"]];
+  const BL=[["R","Repeatable","at PCBA level"],["I","Intermittent /","handling sensitive"],["N","No fault found","at PCBA level"],["D","Dependent on","heat or soak"]];
   BL.forEach(([k,a,b],i)=>{
     const x=bx0+i*(bw+gap); let s;
     if(neutral) s="neutral"; else if(!cls) s= sbS==="locked"?"locked":"locked"; else s = (k===cls)? sbS : "na";
     const [f,st,tx]=P[s];
     g+=arrow(`M${centers[i]} 550 V${by-2}`);
-    g+=`<g data-go="SB"><rect x="${x}" y="${by}" width="${bw}" height="60" rx="6" fill="${f}" stroke="${st}" stroke-width="${s==="active"?2.6:1.6}" ${s==="na"?'stroke-dasharray="5 4"':""}/>
+    g+=`<g data-go="SB" data-tip="B_${k}"><rect x="${x}" y="${by}" width="${bw}" height="60" rx="6" fill="${f}" stroke="${st}" stroke-width="${s==="active"?2.6:1.6}" ${s==="na"?'stroke-dasharray="5 4"':""}/>
       ${T(x+12,by+38,k,`font-size="24" font-weight="800" fill="${s==="na"?"#c5cad3":(s==="neutral"?"#1f5fbf":st)}"`)}
       ${T(x+38,by+26,a,`font-size="12" font-weight="700" fill="${tx}"`)}${T(x+38,by+42,b,`font-size="11" fill="${tx}"`)}</g>`;
     g+=line(`M${centers[i]} ${by+60} V${by+76}`);
   });
   g+=line(`M${centers[0]} ${by+76} H${centers[3]}`);
-  g+=T(centers[3]+bw/2-4, by+92, "NFF → skip to Step 6", 'font-size="10" fill="#56627a" text-anchor="end" font-style="italic"');
+  g+=T(centers[2]+bw/2-4, by+92, "NFF → skip to Step 6", 'font-size="10" fill="#56627a" text-anchor="end" font-style="italic"');
   g+=arrow(`M${CX} ${by+76} V668`);
   g+=box("S5",670); g+=arrow(`M${CX} 720 V742`);
   g+=box("S6",744); g+=arrow(`M${CX} 794 V816`);
-  g+=dia("S6",818,"Evidence-altering","action needed?");
+  g+=dia("S6",818,"Evidence-altering","action needed?","Q2");
   g+=arrow(`M${CX} 902 V928`); g+=lbl(CX+8,918,"Yes");
   g+=hex("GB",930); g+=T(CX+175,964,"Reject → revise",'font-size="10" fill="#b3261e" font-style="italic"');
   g+=arrow(`M${CX} 990 V1012`);
   g+=box("S7",1014); g+=arrow(`M${CX} 1064 V1086`);
   g+=box("S8",1088); g+=arrow(`M${CX} 1138 V1160`);
   g+=box("S9",1162); g+=arrow(`M${CX} 1212 V1234`);
-  g+=dia("S9",1236,"Mechanism","verified?");
+  g+=dia("S9",1236,"Mechanism","verified?","Q3");
   g+=arrow(`M${CX} 1320 V1348`); g+=lbl(CX+8,1338,"Yes");
   g+=box("S10",1350); g+=arrow(`M${CX} 1400 V1422`);
-  g+=dia("S10",1424,"All verification","passed?");
+  g+=dia("S10",1424,"All verification","passed?","Q4");
   g+=arrow(`M${CX} 1508 V1534`); g+=lbl(CX+8,1524,"Yes");
   g+=hex("GC",1536); g+=T(CX+175,1570,"Reject → revise",'font-size="10" fill="#b3261e" font-style="italic"');
   g+=arrow(`M${CX} 1596 V1618`);
@@ -1034,7 +1183,7 @@ function setView(v){
 function select(id){ selId=id; setView("work"); window.scrollTo({top:0}); }
 
 /* ================= events: stage editor ================= */
-const RERENDER_KEYS = new Set(["cls","path","verified","allpass","outcome","pkg","reproduced","N_esc","conf","disp","T_img","T_local","T_esc"]);
+const RERENDER_KEYS = new Set(["cls","path","verified","allpass","outcome","pkg","reproduced","N_esc","conf","disp","D_img","D_local","D_esc"]);
 $("#stage").addEventListener("input", e=>{
   const t=e.target; const st=S.stages[selId]; if(!canEdit(selId)) return;
   if(t.dataset.t){ const f=fieldsFor(selId).find(x=>x.key===t.dataset.t);
@@ -1117,6 +1266,7 @@ async function saveFile(){
 }
 function loadCase(obj, name){
   if(!obj || obj.schema!==SCHEMA || !obj.stages) throw new Error("Not a PCBA FA case file");
+  migrate(obj);
   ORDER.forEach(id=>{ obj.stages[id]=Object.assign(blankStage(), obj.stages[id]||{}); });
   obj.loops=obj.loops||[]; obj.log=obj.log||[];
   S=obj; dirty=false; selId=null;
@@ -1234,11 +1384,11 @@ function buildReport(blank, photos){
     const s=STAGES[id], st=S.stages[id], gate=s.kind==="gate", ds=blank?"":dstat(id);
     const br=D("S4").cls;
     b+=`<div class="sect ${i===0?"pb":""}"><div class="psec"><h2 class="${gate?"g":""}">${esc(s.no)} — ${esc(id==="SB"&&br&&!blank?"Branch "+br+": "+BRANCH[br].name:s.title)}${gate?" · HOLD POINT":""}</h2>
-      <div class="guide">${s.guide}</div><div class="meta">Owner: ${s.editors.map(rn).join(" / ")}${gate?" · Approvers: "+s.approvers.map(rn).join(", "):""}${ds?" · Status: <b>"+STATUS_TXT[ds]+"</b>":""}</div></div>`;
+      <div class="guide">${s.guide}${WHY[id]?"<br><b>Purpose:</b> "+esc(WHY[id].p):""}</div><div class="meta">Owner: ${s.editors.map(rn).join(" / ")}${gate?" · Approvers: "+s.approvers.map(rn).join(", "):""}${ds?" · Status: <b>"+STATUS_TXT[ds]+"</b>":""}</div></div>`;
     if(ds==="na"){ b+=`<p class="meta"><i>Not applicable — bypassed by recorded decision.</i></p></div>`; return; }
     if(id==="SB"){
       if(br && !blank) b+=pfields(BRANCH[br].fields, st.data, false);
-      else Object.entries(BRANCH).forEach(([k,B])=>{ b+=`<h3>Branch ${k} — ${esc(B.name)} (complete only if selected)</h3>`+pfields(B.fields, st.data, true); });
+      else BR_ORDER.map(k=>[k,BRANCH[k]]).forEach(([k,B])=>{ b+=`<h3>Branch ${k} — ${esc(B.name)} (complete only if selected)</h3>`+pfields(B.fields, st.data, true); });
     } else b+=pfields(s.fields, st.data, blank);
     const cl=checksFor(id);
     if(cl.length){ b+=`<table class="t"><tr><th style="width:9mm">No.</th><th>Check / hold point</th><th>Required evidence</th><th style="width:16mm">Done</th></tr>`;
@@ -1289,10 +1439,29 @@ $("#tabs").onclick=e=>{ const t=e.target.closest(".tab"); if(t) setView(t.datase
 addEventListener("beforeunload", e=>{ if(dirty){ e.preventDefault(); e.returnValue=""; } });
 addEventListener("keydown", e=>{ if((e.ctrlKey||e.metaKey) && e.key.toLowerCase()==="s"){ e.preventDefault(); saveFile(); } });
 
+/* ================= hover tooltips ================= */
+(function(){
+  const tip=$("#tip"); let cur=null;
+  function place(e){ const pad=14, w=tip.offsetWidth, h=tip.offsetHeight;
+    let x=e.clientX+pad, y=e.clientY+pad;
+    if(x+w>innerWidth-8) x=Math.max(8,e.clientX-w-pad);
+    if(y+h>innerHeight-8) y=Math.max(8,innerHeight-h-8);
+    tip.style.left=x+"px"; tip.style.top=y+"px"; }
+  document.addEventListener("mouseover",e=>{ const el=e.target.closest("[data-tip]"); if(!el||el.closest("#print-root")){ if(cur){tip.classList.remove("show"); cur=null;} return; }
+    if(el!==cur){ cur=el; const h=tipHTML(el.dataset.tip); if(!h){ tip.classList.remove("show"); return; } tip.innerHTML=h; tip.classList.add("show"); } place(e); });
+  document.addEventListener("mousemove",e=>{ if(cur) place(e); });
+  document.addEventListener("scroll",()=>{ tip.classList.remove("show"); cur=null; },true);
+  document.addEventListener("toggle",e=>{ if(e.target.classList&&e.target.classList.contains("why")) lsSet("faw.whyClosed", e.target.open?"":"1"); },true);
+})();
+/* older files used T for heat/soak; now D */
+function migrate(o){ try{ const s4=o.stages.S4.data, sb=o.stages.SB.data;
+  if(s4.cls==="T") s4.cls="D";
+  Object.keys(sb).forEach(k=>{ if(k.startsWith("T_")){ sb["D_"+k.slice(2)]=sb[k]; delete sb[k]; } }); }catch(e){} return o; }
+
 /* ================= boot ================= */
 (function boot(){
   let restored=false;
-  try{ const d=JSON.parse(lsGet("faw.draft")||"null"); if(d && d.S && d.S.schema===SCHEMA){ S=d.S; ORDER.forEach(id=>S.stages[id]=Object.assign(blankStage(),S.stages[id]||{})); dirty=!!d.dirty; restored=true; } }catch(e){}
+  try{ const d=JSON.parse(lsGet("faw.draft")||"null"); if(d && d.S && d.S.schema===SCHEMA){ S=migrate(d.S); ORDER.forEach(id=>S.stages[id]=Object.assign(blankStage(),S.stages[id]||{})); dirty=!!d.dirty; restored=true; } }catch(e){}
   if(!S){ S=newCase(); }
   setView("work");
   if(restored && dirty) toast("Restored your unsaved work from this browser");
