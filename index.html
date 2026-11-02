@@ -276,7 +276,7 @@ dialog::backdrop{background:rgba(15,25,45,.5)}
   <button class="tbtn" id="bSave" title="Save case file">Save</button>
   <button class="tbtn primary" id="bSend" title="Save and send to the next role">Send to…</button>
   <button class="tbtn" id="bPrint" title="Print or save as PDF">Print / PDF</button>
-  <button class="who" id="bWho"><span class="av" id="whoAv">?</span><span><b id="whoName">Choose role</b> <span id="whoRole" style="opacity:.75"></span></span></button>
+  <button class="who" id="bWho" title="Change your name or role"><span class="av" id="whoAv">?</span><span><b id="whoName">Choose role</b> <span id="whoRole" style="opacity:.75"></span></span></button>
 </header>
 
 <nav class="tabs" id="tabs">
@@ -322,11 +322,11 @@ dialog::backdrop{background:rgba(15,25,45,.5)}
 
 <!-- role dialog -->
 <dialog id="dRole"><div class="dlg">
-  <h3>Who is working on this case?</h3>
+  <h3>Who is working on this case now?</h3>
   <div class="db">
     <div class="fld"><label for="whoIn">Your name <span class="req">*</span></label><input class="inp" id="whoIn" placeholder="e.g. Soe M."></div>
     <div class="fld"><span class="lab">Your role in this FA</span><div class="roles" id="roleCards"></div></div>
-    <p class="small" style="margin:0">Your role decides which stages you can edit, sign and approve. Name and role are stamped on every signature and history entry.</p>
+    <p class="small" style="margin:0">Pick the role you are acting in <b>right now</b>. Only that role's stages are editable; you can switch any time from the button at top right. Name and role are stamped on every signature and history entry.</p>
   </div>
   <div class="df"><button class="btn pri" id="roleOk">Continue</button></div>
 </div></dialog>
@@ -926,7 +926,7 @@ function renderBanner(){
   const n=nextAction(); let h;
   if(n.done) h=`<div class="banner done"><div class="msg"><b>✓ ${esc(n.text)}</b><span>${esc(n.sub)}</span></div><button class="btn" data-act="print">Print final report</button></div>`;
   else if(n.you) h=`<div class="banner you"><div class="msg"><b>Your turn — ${esc(n.text)}</b><span>${esc(n.sub)}</span></div>${selId!==n.id?`<button class="btn pri" data-sel="${n.id}">Open</button>`:""}</div>`;
-  else h=`<div class="banner wait"><div class="msg"><b>Waiting on ${esc(n.roles.map(rn).join(" / "))}</b><span>${esc(n.text)}</span></div><button class="btn pri" data-act="send" data-role="${n.roles[0]}">Send to ${esc(rn(n.roles[0]))}…</button></div>`;
+  else h=`<div class="banner wait"><div class="msg"><b>Waiting on ${esc(n.roles.map(rn).join(" / "))}</b><span>${esc(n.text)}</span></div><button class="btn" data-act="role">Switch role</button><button class="btn pri" data-act="send" data-role="${n.roles[0]}">Send to ${esc(rn(n.roles[0]))}…</button></div>`;
   $("#banner").innerHTML=h;
 }
 
@@ -988,7 +988,7 @@ function renderStage(showMiss){
   if(st.status==="rejected" && st.lastReject) h+=`<div class="warnbox"><b>Rejected by ${esc(st.lastReject.name)} (${rn(st.lastReject.role)}) on ${fmt(st.lastReject.at)}:</b> ${esc(st.lastReject.comment)}</div>`;
   if(st.status==="complete" && st.signoff && st.signoff.hash && st.signoff.hash!==stageHash(st)) h+=`<div class="warnbox"><b>Integrity warning:</b> data in this stage differs from what was signed. The file may have been edited outside the app.</div>`;
   const lp=S.loops.filter(l=>l.to===id); if(lp.length) h+=`<div class="loopbox"><b>Reopened by loop-back:</b> ${lp.map(l=>`${fmt(l.at)} — ${esc(l.name)}: “${esc(l.reason)}”`).join("<br>")}</div>`;
-  if(!ed && ["active","rejected"].includes(ds) && user.role && user.role!=="VIEW") h+=`<div class="infobox">You are signed in as <b>${rn(user.role)}</b>. This stage is completed by ${s.editors.map(rn).join(" or ")}. Use <b>Send to…</b> to pass the file on.</div>`;
+  if(!ed && ["active","rejected"].includes(ds)) h+=`<div class="warnbox" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;color:#5c130f"><span style="flex:1;min-width:220px"><b>Read-only for you.</b> You are acting as <b>${user.role?rn(user.role):"no role"}</b>; this stage is filled in by <b>${s.editors.map(rn).join(" or ")}</b>. Switch role if that is you, or use <b>Send to…</b> to pass the file on.</span><button class="btn pri sm" data-act="role">Switch role</button></div>`;
 
   // fields
   const fl=fieldsFor(id)||[];
@@ -1224,6 +1224,7 @@ document.addEventListener("click", e=>{
   else if(a==="reject") reject(selId);
   else if(a==="reopen") reopen(selId);
   else if(a==="send") openSend(t.dataset.role);
+  else if(a==="role") openRole();
   else if(a==="print") $("#dPrint").showModal();
 });
 $("#lightbox").addEventListener("click", ()=>$("#lightbox").close());
@@ -1465,7 +1466,7 @@ function migrate(o){ try{ const s4=o.stages.S4.data, sb=o.stages.SB.data;
   if(!S){ S=newCase(); }
   setView("work");
   if(restored && dirty) toast("Restored your unsaved work from this browser");
-  if(!user.role) openRole();
+  openRole();
 })();
 </script>
 </body>
