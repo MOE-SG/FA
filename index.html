@@ -175,6 +175,25 @@ textarea.inp{min-height:68px;resize:vertical}
 .why .wb ul{margin:4px 0;padding-left:18px}
 .why .wb .risk{color:var(--bad);font-size:12.8px}
 .infoi{display:inline-grid;place-items:center;width:16px;height:16px;border-radius:50%;border:1px solid #9aa3b2;font:700 10px var(--sans);color:#6b7487;margin-left:4px;vertical-align:1px;cursor:help}
+.scope{background:#fff;border:1px solid #e3c7a0;border-left:4px solid var(--warn);border-radius:8px;margin-bottom:12px}
+.scope summary{cursor:pointer;padding:11px 16px;font-weight:700;color:#5a3800;list-style:none}
+.scope summary::-webkit-details-marker{display:none}
+.scope summary:before{content:"\26A0  "}
+.scope .sb{padding:0 16px 12px;font-size:13.2px;color:var(--ink2)}
+.scope ul{margin:6px 0 4px;padding-left:18px}
+.scope li{margin:3px 0}
+.scope li b{color:var(--ink)}
+.legend .scopel{margin-top:14px;border-top:1px solid var(--line2);padding-top:10px}
+.legend .scopel ul{margin:4px 0 0;padding-left:16px;font-size:12.5px;color:var(--ink2)}
+.legend .scopel li{margin:4px 0}
+.mtbl{width:100%;border-collapse:collapse;font-size:12.8px;margin-top:4px}
+.mtbl th,.mtbl td{border:1px solid var(--line2);padding:6px 8px;text-align:left;vertical-align:top}
+.mtbl th{background:#f5f7fa;font-size:11.5px;color:var(--ink2)}
+.mtbl tr.on td{background:#f3faf6}
+.mtbl td:first-child{font-weight:700;white-space:nowrap}
+.rcstart{border:1px solid #bcd0f1;background:var(--accent-bg);border-radius:6px;padding:9px 12px;font-size:13px;color:#123c7a}
+.rctips{font-size:12.5px;color:var(--ink2);margin:6px 0 0;padding-left:18px}
+.rcsub{font:700 11px var(--sans);letter-spacing:.08em;text-transform:uppercase;color:var(--accent);margin-top:6px}
 /* ---------- other views ---------- */
 .pane{max-width:1100px;margin:0 auto;padding:16px}
 .flowwrap{display:grid;grid-template-columns:minmax(0,1fr) 260px;gap:16px;align-items:start}
@@ -262,6 +281,13 @@ dialog::backdrop{background:rgba(15,25,45,.5)}
 .pr .ok{color:#1e7b4f}.pr .bad{color:#b3261e}.pr .warn{color:#a76400}
 .pr .note{font-size:8pt;border:.6pt solid #555;padding:2mm;margin-top:4mm}
 .pr .psec{break-inside:avoid}
+.pr .pinfo{font-size:8.5pt;margin-top:3mm;break-inside:avoid}
+.pr .pinfo .mtbl{width:100%;border-collapse:collapse}
+.pr .pinfo .mtbl th,.pr .pinfo .mtbl td{border:.6pt solid #555;padding:1.2mm 2mm;text-align:left;vertical-align:top}
+.pr .pinfo .rcstart{border:.6pt solid #555;padding:2mm}
+.pr .pinfo .rcsub{font-weight:700;margin-top:2mm}
+.pr .pinfo .rctips{margin:1mm 0;padding-left:5mm}
+.pr .pinfo .small{font-size:8pt}
 </style>
 </head>
 <body>
@@ -307,6 +333,7 @@ dialog::backdrop{background:rgba(15,25,45,.5)}
         <div class="lg" style="color:#b3261e">⬡ Hold point — multi-role approval</div>
         <div class="lg">◇ Decision recorded in the step above</div>
         <p class="small" style="margin:12px 0 0"><b>Hover</b> any box for its purpose and why it matters. Click to open that stage. Dashed return lines are the loop-backs: a failed mechanism check returns to hypotheses; a failed verification returns to localization.</p>
+        <div class="scopel"><h4 style="color:#a76400">Not covered by this app</h4><ul id="scopeLegend"></ul></div>
       </div>
     </div>
   </section>
@@ -376,15 +403,15 @@ dialog::backdrop{background:rgba(15,25,45,.5)}
    PCBA FA Workflow — single-file app. Case data lives in a .fa.json file
    that is passed between roles. Nothing is sent to any server.
    ===================================================================== */
-const APP_VER = "1.0";
+const APP_VER = "1.1";
 const SCHEMA = "pcba-fa-case";
 
 const ROLES = {
   FA:   {name:"FA Owner",          ab:"FA",  desc:"Owns the case: intake, hypotheses, disposition prep, closure"},
-  QA:   {name:"Quality",           ab:"QA",  desc:"Containment, inspection, gate approvals, CAPA"},
-  TEST: {name:"Test",              ab:"TST", desc:"Test plan, reproduction, verification testing"},
-  ENG:  {name:"Engineering",       ab:"ENG", desc:"Diagnostics, localization, mechanism verification"},
-  RWK:  {name:"Rework Technician", ab:"RWK", desc:"Authorized rework, substitution, destructive FA"},
+  QA:   {name:"Quality / Reliability",           ab:"QA",  desc:"Containment, inspection, gate approvals, CAPA"},
+  TEST: {name:"Test",              ab:"TST", desc:"Retired role, kept so older case files still read correctly", hidden:1},
+  ENG:  {name:"Engineering",       ab:"ENG", desc:"Test plan, diagnostics, localization, mechanism verification, disposition and release"},
+  RWK:  {name:"PCB Technician",    ab:"TEC", desc:"Reproduction, diagnostics, localization, verification testing, authorized rework"},
   MFG:  {name:"Manufacturing",     ab:"MFG", desc:"Disposition and release approval"},
   VIEW: {name:"Viewer",            ab:"VW",  desc:"Read-only review and printing"}
 };
@@ -428,8 +455,8 @@ const STAGES = {
       F("findings","Inspection findings and anomaly map","textarea",{req:1,span:2}),
       F("inspector","Inspected by","text",{req:1}), F("inspDate","Inspection date","date",{req:1})
     ]},
-  GA:{kind:"gate", no:"Gate A", title:"Diagnostic test authorization", short:"Diagnostic test authorization", editors:["TEST"], approvers:["TEST","QA"],
-    guide:"Define the test purpose, applicable procedure and revision, expected result, acceptance limits, equipment and calibration, fixture or simulator, firmware, stop criteria, safety controls and product-integrity risks. <b>Test and Quality approval required before energizing, stressing or changing the test configuration.</b>",
+  GA:{kind:"gate", no:"Gate A", title:"Diagnostic test authorization", short:"Diagnostic test authorization", editors:["ENG"], approvers:["ENG","QA"],
+    guide:"Define the test purpose, applicable procedure and revision, expected result, acceptance limits, equipment and calibration, fixture or simulator, firmware, stop criteria, safety controls and product-integrity risks. <b>Engineering provides the plan. Engineering and Quality approval required before energizing, stressing or changing the test configuration.</b>",
     fields:[
       F("purpose","Scope / purpose of testing","textarea",{req:1,span:2}),
       F("proc","Procedure / plan / revision","text",{req:1}), F("step","Procedure step / acceptance criterion ref."),
@@ -439,7 +466,7 @@ const STAGES = {
       F("fwsw","Firmware / test software and version"), F("calBy","Equipment and calibration verified by","text",{req:1}),
       F("risks","Safety controls and product-integrity risks","textarea",{req:1,span:2})
     ]},
-  S4:{kind:"step", no:"Step 4", title:"Reproduce the reported failure", short:"Reproduce reported failure", editors:["TEST"], photos:true,
+  S4:{kind:"step", no:"Step 4", title:"Reproduce the reported failure", short:"Reproduce reported failure", editors:["RWK","ENG"], photos:true,
     guide:"Start with the reported configuration and environment. Record expected versus actual result, test setup, load or simulator, firmware, temperature, soak time, duty cycle, operator, date/time and native raw test files. Then <b>classify the behavior</b> — this selects the branch.",
     fields:[
       F("config","Test configuration and environment","textarea",{req:1,span:2}),
@@ -452,10 +479,10 @@ const STAGES = {
       F("cls","Behavior classification (selects branch)","radio",{req:1,span:2,options:[["R","R — Repeatable at PCBA level"],["I","I — Intermittent / handling sensitive"],["N","N — No fault found at PCBA level"],["D","D — Dependent on heat or soak"]]}),
       F("freq","Frequency of occurrence"), F("det","Detection level","select",{req:1,options:["","PCBA","Insert","Tool","Field"]})
     ]},
-  SB:{kind:"branch", no:"Branch", title:"Failure-behavior branch", short:"Branch work", editors:["ENG","TEST"], photos:true,
+  SB:{kind:"branch", no:"Branch", title:"Failure-behavior branch", short:"Branch work", editors:["RWK","ENG"], photos:true,
     guide:"Complete the checks for the branch selected in Step 4. All branches merge at Step 5. Capture evidence before any component substitution or rework.",
     fields:null /* dynamic, see branchFields */},
-  S5:{kind:"step", no:"Step 5", title:"Localize the failing function", short:"Localize failing function", editors:["ENG"],
+  S5:{kind:"step", no:"Step 5", title:"Localize the failing function", short:"Localize failing function", editors:["RWK","ENG"],
     guide:"Narrow the evidence from system symptom to functional block, circuit, net, interconnect and suspect item. Record purpose, expected result, actual result and next decision for <b>every</b> diagnostic check.",
     fields:[
       F("block","Functional block","text",{req:1}), F("net","Circuit / net"),
@@ -500,7 +527,7 @@ const STAGES = {
       F("inspect","Removed item and PCB-area inspection (microscope / X-ray / visual)","textarea",{req:1,span:2}),
       F("retained","Retained item ID / location")
     ]},
-  S9:{kind:"step", no:"Step 9", title:"Verify the failure mechanism", short:"Verify failure mechanism", editors:["ENG"],
+  S9:{kind:"step", no:"Step 9", title:"Verify the failure mechanism", short:"Verify failure mechanism", editors:["RWK","ENG"],
     guide:"Show the symptom existed before action, apply the controlled correction, and demonstrate that the symptom is removed under the original conditions. Independently verify the suspect component or interconnect where practical. <b>A pass after replacement alone is not proof of root cause.</b>",
     fields:[
       F("before","Evidence the symptom existed before action","textarea",{req:1}),
@@ -509,7 +536,7 @@ const STAGES = {
       F("mech","Failure mechanism statement","textarea",{req:1,span:2}),
       F("verified","Mechanism verified?","radio",{req:1,span:2,options:[["yes","Yes — mechanism demonstrated"],["no","No — loop back to Step 6 and revise hypotheses"]]})
     ]},
-  S10:{kind:"step", no:"Step 10", title:"Representative verification", short:"Representative verification", editors:["TEST"],
+  S10:{kind:"step", no:"Step 10", title:"Representative verification", short:"Representative verification", editors:["RWK","ENG"],
     guide:"Repeat the original failing test, then complete applicable PCBA functional, loop, approved thermal, representative insert and tool-level tests. Confirm configuration, firmware and test records.",
     fields:[
       F("tests","Verification tests","table",{req:1,span:2,fixed:1,cols:[{k:"test",l:"Test",ro:1},{k:"proc",l:"Procedure / rev"},{k:"res",l:"Result",type:"select",options:["","Pass","Fail","N/A"]},{k:"ref",l:"Native data ref."}],
@@ -517,8 +544,8 @@ const STAGES = {
       F("cfg","Configuration, firmware and test records confirmed","confirm",{req:1,span:2}),
       F("allpass","All applicable verification passed?","radio",{req:1,span:2,options:[["yes","Yes — proceed to disposition"],["no","No — loop back to Step 5 localization"]]})
     ]},
-  GC:{kind:"gate", no:"Gate C", title:"Disposition and release", short:"Disposition & release", editors:["FA","QA"], approvers:["ENG","QA","TEST","MFG"],
-    guide:"Approve the conclusion confidence, affected-product scope, residual risk, repair/scrap/return/hold decision, verification results, deviation or concession, corrective action and any test/process change. <b>Engineering, Quality, Test and Manufacturing approval required before release.</b>",
+  GC:{kind:"gate", no:"Gate C", title:"Disposition and release", short:"Disposition & release", editors:["ENG","FA"], approvers:["ENG","QA"],
+    guide:"Approve the conclusion confidence, affected-product scope, residual risk, repair/scrap/return/hold decision, verification results, deviation or concession, corrective action and any test/process change. <b>Engineering and Quality / Reliability approval required before release.</b>",
     fields:[
       F("conf","Conclusion confidence","radio",{req:1,span:2,options:[["confirmed","Confirmed"],["probable","Probable"],["nff","No fault found"]]}),
       F("cause","Conclusion / root-cause statement","textarea",{req:1,span:2}),
@@ -526,10 +553,19 @@ const STAGES = {
       F("disp","Disposition","radio",{req:1,span:2,options:[["repair","Repair"],["scrap","Scrap"],["return","Return"],["hold","Hold"],["other","Other"]]}),
       F("dispNote","Disposition details"), F("dev","Deviation / concession ref.")
     ]},
-  S11:{kind:"step", no:"Step 11", title:"Trend and feedback", short:"Trend & feedback", editors:["QA","FA"],
-    guide:"Update failure trends and initiate RCCA/CAPA, PFMEA, control-plan, handling, inspection, work-instruction or test-coverage actions as appropriate. Assign owner, due date and objective effectiveness evidence.",
+  S11:{kind:"step", no:"Step 11", title:"Trend, RCCA and feedback", short:"Trend, RCCA & feedback", editors:["QA","FA"],
+    guide:"Update failure trends, run a <b>5-Why</b> from the verified mechanism to the systemic root cause, then initiate RCCA/CAPA, PFMEA, control-plan, handling, inspection, work-instruction or test-coverage actions as appropriate. Assign owner, due date and objective effectiveness evidence.",
     fields:[
       F("trend","Failure trend record updated","confirm",{req:1,span:2}),
+      F("rcMethods","","info",{html:rcMethodsHTML}),
+      F("rcStart","","info",{html:rcStartHTML}),
+      F("why5","5-Why chain (each row: Why? → Because…)","table",{span:2,rows:[{},{},{},{},{}],cols:[
+        {k:"q",l:"Why?"},{k:"a",l:"Because…"},{k:"ev",l:"Evidence"},
+        {k:"vf",l:"Status",type:"select",options:["","Verified","Assumed"]}]}),
+      F("rcRoot","Systemic root cause (from 5-Why or other analysis)","textarea",{req:1,span:2}),
+      F("rcCat","Root-cause category","select",{req:1,options:["","Design","Process / method","Material / supplier","Machine / fixture","Measurement / test coverage","People / training","Handling / environment","Standard missing or unclear","Not determined (justify)"]}),
+      F("rcEscape","Why was it not detected earlier? (escape point)","textarea"),
+      F("rcOther","Other analysis used (Fishbone, Fault Tree, Window Analysis) and reference","textarea",{span:2}),
       F("actions","Corrective / feedback actions","table",{req:1,span:2,cols:[
         {k:"type",l:"Type",type:"select",options:["","RCCA","CAPA","PFMEA","Control plan","Handling","Inspection","Work instruction","Test coverage","None required"]},
         {k:"desc",l:"Action"},{k:"owner",l:"Owner"},{k:"due",l:"Due",type:"date"},{k:"eff",l:"Effectiveness evidence"},
@@ -570,25 +606,25 @@ const CHECKS = [
   {no:2, st:"S2", t:"Contain the PCBA and possible affected population.", ev:"Quarantine location, quantity, serial/lot scope, decision and approver.", ow:"Quality"},
   {no:3, st:"S3", t:"Preserve as-received condition.", ev:"Timestamped photographs, packaging condition and chain-of-custody log.", ow:"FA owner"},
   {no:4, st:"S3", t:"Complete incoming visual inspection.", ev:"Component, connector, solder, coating, contamination, flex and damage record.", ow:"Quality / Eng."},
-  {no:5, st:"GA", t:"Identify controlled requirements and limits.", ev:"Procedure/drawing/specification title, revision, step and acceptance criterion.", ow:"Test / Eng."},
-  {no:6, st:"GA", t:"Verify equipment, fixture and calibration.", ev:"Equipment ID, calibration due date, fixture/simulator revision and software.", ow:"Test"},
-  {no:7, st:"GA", t:"Approve diagnostic test plan.", ev:"Scope, limits, stop criteria, risks and approval signatures.", ow:"Test / Quality", gate:"A", auto:1},
-  {no:8, st:"S4", t:"Reproduce failure using reported configuration.", ev:"Native data, expected/actual, environment, setup photo and operator/date/time.", ow:"Test"},
+  {no:5, st:"GA", t:"Identify controlled requirements and limits.", ev:"Procedure/drawing/specification title, revision, step and acceptance criterion.", ow:"Engineering"},
+  {no:6, st:"GA", t:"Verify equipment, fixture and calibration.", ev:"Equipment ID, calibration due date, fixture/simulator revision and software.", ow:"Eng. / PCB Tech"},
+  {no:7, st:"GA", t:"Approve diagnostic test plan.", ev:"Scope, limits, stop criteria, risks and approval signatures.", ow:"Eng. / Quality", gate:"A", auto:1},
+  {no:8, st:"S4", t:"Reproduce failure using reported configuration.", ev:"Native data, expected/actual, environment, setup photo and operator/date/time.", ow:"PCB Tech / Eng."},
   {no:9, st:"S4", t:"Classify behavior and detection level.", ev:"R/I/N/D branch, frequency and PCBA/insert/tool/field detection level.", ow:"FA owner"},
-  {no:10,st:"SB", t:"Compare with known-good control.", ev:"Control identity, matching setup and side-by-side measurements.", ow:"Engineering"},
-  {no:11,st:"S5", t:"Localize functional block.", ev:"Current, rails, reset/clock, communications, memory, I/O and suspect nets.", ow:"Engineering"},
-  {no:12,st:"SB", t:"For NFF, verify test equivalence.", ev:"Actual vs simulated load, mechanics, firmware, temperature, soak and duty cycle.", ow:"Test / Eng.", nffOnly:1},
+  {no:10,st:"SB", t:"Compare with known-good control.", ev:"Control identity, matching setup and side-by-side measurements.", ow:"PCB Tech / Eng."},
+  {no:11,st:"S5", t:"Localize functional block.", ev:"Current, rails, reset/clock, communications, memory, I/O and suspect nets.", ow:"PCB Tech / Eng."},
+  {no:12,st:"SB", t:"For NFF, verify test equivalence.", ev:"Actual vs simulated load, mechanics, firmware, temperature, soak and duty cycle.", ow:"PCB Tech / Eng.", nffOnly:1},
   {no:13,st:"S6", t:"Rank plausible causes and separate facts from hypotheses.", ev:"Cause matrix covering method, material, tooling, measurement, environment, firmware and human factors.", ow:"FA owner"},
   {no:14,st:"GB", t:"Authorize substitution, removal or destructive work.", ev:"Signed rationale, controlled method and sample-retention plan.", ow:"Eng. / Quality", gate:"B", auto:1},
   {no:15,st:"S7", t:"Capture all pre-rework evidence.", ev:"Measurements, waveforms, thermal/microscope images and interconnect data.", ow:"Engineering"},
-  {no:16,st:"S8", t:"Execute controlled rework or substitution.", ev:"Operator, equipment, materials, component traceability, parameters and photos.", ow:"Authorized rework"},
+  {no:16,st:"S8", t:"Execute controlled rework or substitution.", ev:"Operator, equipment, materials, component traceability, parameters and photos.", ow:"PCB Tech (authorized)"},
   {no:17,st:"S8", t:"Inspect removed item and PCB area.", ev:"Microscope/X-ray/visual findings, pads, solder and retained-item ID.", ow:"Quality / Eng."},
-  {no:18,st:"S9", t:"Verify mechanism, not only restored function.", ev:"Before/after evidence and independent component/interconnect verification.", ow:"Engineering"},
-  {no:19,st:"S10",t:"Repeat original failing test.", ev:"Native data showing failure absent under original conditions.", ow:"Test"},
-  {no:20,st:"S10",t:"Complete representative verification.", ev:"PCBA, loop, approved thermal, insert and tool-level tests as applicable.", ow:"Test"},
+  {no:18,st:"S9", t:"Verify mechanism, not only restored function.", ev:"Before/after evidence and independent component/interconnect verification.", ow:"PCB Tech / Eng."},
+  {no:19,st:"S10",t:"Repeat original failing test.", ev:"Native data showing failure absent under original conditions.", ow:"PCB Tech / Eng."},
+  {no:20,st:"S10",t:"Complete representative verification.", ev:"PCBA, loop, approved thermal, insert and tool-level tests as applicable.", ow:"PCB Tech / Eng."},
   {no:21,st:"GC", t:"Define affected-product scope.", ev:"Serial/lot/date/rework/test-history review and scope rationale.", ow:"Quality / Eng."},
   {no:22,st:"GC", t:"Assign conclusion confidence.", ev:"Confirmed, probable or NFF; evidence, uncertainty and residual risk.", ow:"FA owner"},
-  {no:23,st:"GC", t:"Approve disposition and release.", ev:"Disposition, verification, sign-offs and deviation/concession if applicable.", ow:"Eng./Q/Test/Mfg.", gate:"C", auto:1},
+  {no:23,st:"GC", t:"Approve disposition and release.", ev:"Disposition, verification, sign-offs and deviation/concession if applicable.", ow:"Eng. / Quality", gate:"C", auto:1},
   {no:24,st:"S11",t:"Issue corrective action and trend feedback.", ev:"RCCA/CAPA/PFMEA/test/work-instruction action, owner, due date and effectiveness.", ow:"Quality / Owner"}
 ];
 
@@ -596,13 +632,44 @@ const CHECKS = [
 const EVPKG = [
   {g:"Identity and traceability", c:"FDC/RQF; PCBA P/N/SN/rev; insert/tool IDs; firmware; build, repair and test history.", k:"Identifiers agree across labels, system records and raw files.", ow:"FA / Quality", st:["S1"]},
   {g:"As-received condition", c:"Timestamped photos, packaging, chain of custody, inspection and anomaly map.", k:"Captured before cleaning, rework, removal or evidence-altering checks.", ow:"Quality", st:["S2","S3"]},
-  {g:"Requirements", c:"Controlled procedure/drawing/specification, revision, step, expected result and limit.", k:"Missing or conflicting criteria are escalated to the document owner.", ow:"Eng. / Test", st:["GA"]},
-  {g:"Test setup and raw data", c:"Equipment/calibration IDs, fixture/simulator, software, wiring, environment and native files.", k:"Setup is reproducible; native data retained, not only screenshots.", ow:"Test", st:["GA","S4"]},
-  {g:"Diagnostic evidence", c:"Plan, measurements, waveforms, thermal images, known-good comparison and cause ranking.", k:"Each check states purpose, expected result, actual result and next branch.", ow:"Engineering", st:["SB","S5","S6"]},
+  {g:"Requirements", c:"Controlled procedure/drawing/specification, revision, step, expected result and limit.", k:"Missing or conflicting criteria are escalated to the document owner.", ow:"Engineering", st:["GA"]},
+  {g:"Test setup and raw data", c:"Equipment/calibration IDs, fixture/simulator, software, wiring, environment and native files.", k:"Setup is reproducible; native data retained, not only screenshots.", ow:"Eng. / PCB Tech", st:["GA","S4"]},
+  {g:"Diagnostic evidence", c:"Plan, measurements, waveforms, thermal images, known-good comparison and cause ranking.", k:"Each check states purpose, expected result, actual result and next branch.", ow:"Eng. / PCB Tech", st:["SB","S5","S6"]},
   {g:"Rework / destructive FA", c:"Approval, method, operator, materials, component traceability, photos and retained samples.", k:"No unauthorized action; sample identity and evidence loss recorded.", ow:"Eng. / Quality", st:["GB","S7","S8"]},
-  {g:"Verification / disposition", c:"Original test repeat, representative tests, scope, risk, disposition and release.", k:"Applicable tests pass; exceptions have approved deviation/concession.", ow:"Eng./Q/Test/Mfg.", st:["S9","S10","GC"]},
+  {g:"Verification / disposition", c:"Original test repeat, representative tests, scope, risk, disposition and release.", k:"Applicable tests pass; exceptions have approved deviation/concession.", ow:"Eng. / Quality", st:["S9","S10","GC"]},
   {g:"Corrective action / trending", c:"RCCA/CAPA, PFMEA/control plan/test updates, owner, due date and effectiveness.", k:"Action addresses occurrence or detection with objective evidence.", ow:"Quality / Owner", st:["S11"]}
 ];
+
+/* What this app does NOT cover (shown before Step 1, beside the flowchart and in print) */
+const SCOPE_OUT = [
+  ["Systemic root cause and full RCCA", "The app proves the physical failure mechanism on one unit. Step 11 starts the 5-Why, but the full corrective-action investigation (8D, EAS, DMAIC or CAPA) runs in your quality system."],
+  ["Trending across cases", "Each case is a separate file. Pareto, stratification and control charts across many failures must be done in your FRACAS database or SPC tool."],
+  ["CAPA tracking and effectiveness monitoring", "Actions are recorded in Step 11, but follow-up, reminders and effectiveness checks after closure are not tracked here."],
+  ["Containment execution", "Step 2 records the affected scope. Purging stock, WIP and field units, recalls and customer notification are handled outside the app."],
+  ["Supplier FA and RMA handling", "Returning parts to a supplier and managing their 8D or FA report is not covered."],
+  ["Controlled procedures and limits", "The app references test procedures, limits and work instructions; it does not replace or control those documents."],
+  ["Validated electronic signatures", "Sign-offs record name, role, time and a content fingerprint only. Use an approved e-signature system where one is required."],
+  ["Blame or liability", "The record explains causes to prevent recurrence. It does not assign personal responsibility or liability."]
+];
+function scopeHTML(){ return `<ul>${SCOPE_OUT.map(([a,b])=>`<li><b>${esc(a)}.</b> ${esc(b)}</li>`).join("")}</ul>`; }
+
+/* RCCA methods: only 5-Why is built in; the others are guidance */
+const RC_METHODS = [
+  ["5-Why", "Built in below", "One clear causal chain from a verified mechanism. Ask why it occurred, and separately why it was not detected (escape)."],
+  ["Fishbone (Ishikawa)", "Guidance", "Many possible causes and no clear chain yet. Brainstorm as a team across Man, Machine, Method, Material, Measurement and Environment, then take the strongest branch into the 5-Why."],
+  ["Fault Tree Analysis", "Guidance", "Several causes that combine (AND/OR), safety-critical or system-level failures, or when you need to show which combinations lead to the event. See IEC 61025."],
+  ["Window Analysis", "Guidance", "The cause involves people or procedures. Classifies it as: no standard exists, standard not communicated, or standard known but not followed. Each needs a different fix."]
+];
+function rcMethodsHTML(){
+  return `<div class="rcsub">Which method to use</div><table class="mtbl"><tr><th>Method</th><th>In this app</th><th>When to use it</th></tr>${RC_METHODS.map(([a,b,c],i)=>`<tr${i===0?' class="on"':""}><td>${esc(a)}</td><td>${esc(b)}</td><td>${esc(c)}</td></tr>`).join("")}</table>
+  <div class="small" style="margin-top:6px">If you use Fishbone, Fault Tree or Window Analysis, attach or reference the diagram in <b>Other analysis used</b> below and carry the conclusion into the systemic root cause.</div>`;
+}
+function rcStartHTML(){
+  const m=(S&&S.stages&&S.stages.S9&&S.stages.S9.data.mech)||"", c=(S&&S.stages&&S.stages.GC&&S.stages.GC.data.cause)||"";
+  const t=m||c;
+  return `<div class="rcsub">5-Why — starting point</div><div class="rcstart">${t?`<b>Verified mechanism (Step 9${m?"":" / Gate C"}):</b> ${esc(t)}`:"No verified mechanism recorded yet. Start the chain from the Step 9 mechanism statement or the Gate C conclusion."}</div>
+  <ul class="rctips"><li>Answer each “Why?” with a fact, and note the evidence that confirms it.</li><li>Stop at a cause your organisation controls and can fix (a design rule, process, standard or test coverage), not at “operator error”.</li><li>Check it backwards: reading the chain upward with “therefore” should make sense.</li><li>Use fewer or more than five rows as needed. Run a second chain for “why wasn't it detected?” if the defect escaped.</li></ul>`;
+}
 
 /* ================= utilities ================= */
 const $ = s => document.querySelector(s);
@@ -647,7 +714,7 @@ const WHY = {
     w:["Powering a damaged board can destroy the evidence: a short burns open, a marginal joint fails, and secondary damage hides the root cause.",
        "Testing outside approved limits can overstress good parts and create new failures.",
        "An out-of-calibration instrument, wrong fixture or wrong firmware produces a false pass or fail.",
-       "Stop criteria tell the operator when to stop before the unit is harmed. Test and Quality sign so the results are both safe and valid."],
+       "Stop criteria tell the operator when to stop before the unit is harmed. Engineering provides the plan; Engineering and Quality sign so the results are both safe and valid."],
     r:"Evidence is destroyed on first power-up, or the test result is meaningless."},
   S4:{t:"Step 4 · Reproduce the reported failure",
     p:"Confirm the failure is real and observable under controlled, recorded conditions.",
@@ -726,11 +793,12 @@ const WHY = {
     p:"Decide what happens to this unit and to any affected population.",
     w:["State an honest confidence level: Confirmed, Probable or NFF. Each carries different risk.",
        "The affected scope (serials, lots, dates, rework history) protects the other units.",
-       "Engineering, Quality, Test and Manufacturing agree the residual risk and any deviation before release."],
+       "Engineering and Quality / Reliability co-sign the disposition, residual risk and any deviation before release."],
     r:"Suspect product is released, or good product is scrapped without reason."},
-  S11:{t:"Step 11 · Trend and feedback",
+  S11:{t:"Step 11 · Trend, RCCA and feedback",
     p:"Make the learning stick so the failure doesn't come back.",
     w:["Trending across cases reveals repeat failure modes that a single FA can't see.",
+       "The 5-Why takes the verified mechanism to the systemic cause: why the design, process or standard allowed it.",
        "RCCA/CAPA, PFMEA, control-plan, work-instruction and test-coverage updates prevent recurrence or improve detection.",
        "An owner, a due date and effectiveness evidence prove the action actually worked."],
     r:"The same failure is analysed again next quarter."},
@@ -937,6 +1005,7 @@ function renderField(f, v, ed, showMiss){
   const lab = `${esc(f.label)}${f.req?' <span class="req">*</span>':""}`;
   const cls = "fld"+(f.span===2?" span2":"");
   const id = "f_"+f.key;
+  if(f.type==="info") return `<div class="fld span2">${typeof f.html==="function"?f.html():f.html}</div>`;
   switch(f.type){
     case "textarea": return `<div class="${cls}"><label for="${id}">${lab}</label><textarea class="inp${miss}" id="${id}" data-k="${f.key}"${dis}>${esc(v)}</textarea></div>`;
     case "select": return `<div class="${cls}"><label for="${id}">${lab}</label><select class="inp${miss}" id="${id}" data-k="${f.key}"${dis}>${optList(f.options).map(([a,b])=>`<option value="${esc(a)}"${a===(v||"")?" selected":""}>${esc(b||"— select —")}</option>`).join("")}</select></div>`;
@@ -969,7 +1038,9 @@ function renderStage(showMiss){
   const id=selId, s=STAGES[id], st=S.stages[id], ds=dstat(id), ed=canEdit(id);
   const gate = s.kind==="gate";
   const branch = D("S4").cls;
-  let h=`<div class="card">`;
+  let h="";
+  if(id==="S1") h+=`<details class="scope"${lsGet("faw.scopeClosed")?"":" open"}><summary>Before you start: what this app does not cover</summary><div class="sb">This workflow finds and verifies the failure mechanism on one PCBA, then records disposition and feedback. It does not cover:${scopeHTML()}</div></details>`;
+  h+=`<div class="card">`;
   if(gate) h+=`<div class="holdband">■ HOLD POINT — ${s.approvers.map(rn).join(", ").toUpperCase()} APPROVAL REQUIRED BEFORE PROCEEDING</div>`;
   const title = id==="SB" && branch ? `Branch ${branch} — ${BRANCH[branch].name}` : s.title;
   const iter = S.loops.filter(l=>ORDER.indexOf(id)>=ORDER.indexOf(l.to) && ORDER.indexOf(id)<=ORDER.indexOf(l.from)).length;
@@ -1171,7 +1242,7 @@ function renderLog(){
 function renderAll(){
   if(!selId) selId=activeId()||"S1";
   renderHeader(); renderRail(); renderBanner(); renderStage(false);
-  if(view==="flow") $("#flowHost").innerHTML=flowSVG(false);
+  if(view==="flow"){ $("#flowHost").innerHTML=flowSVG(false); $("#scopeLegend").innerHTML=SCOPE_OUT.map(([a,b])=>`<li title="${esc(b)}"><b>${esc(a)}</b></li>`).join("")+`<li style="list-style:none;margin-left:-16px;color:var(--mute)">Hover an item for details. Full list at the start of Step 1.</li>`; }
   if(view==="check") renderCheck();
   if(view==="log") renderLog();
 }
@@ -1298,7 +1369,7 @@ addEventListener("drop",e=>{ e.preventDefault(); dragN=0; if(ov){ov.remove();ov=
 /* send */
 function openSend(role){
   const n=nextAction(); const sel=$("#sendRole");
-  sel.innerHTML=Object.keys(ROLES).filter(r=>r!=="VIEW").map(r=>`<option value="${r}">${rn(r)}</option>`).join("");
+  sel.innerHTML=Object.keys(ROLES).filter(r=>r!=="VIEW"&&!ROLES[r].hidden).map(r=>`<option value="${r}">${rn(r)}</option>`).join("");
   sel.value = role || (n.roles&&n.roles[0]) || "QA";
   $("#sendFile").textContent = fileName().replace(/_r\d+/, "_r"+(S.meta.rev+1));
   const share = !!(navigator.canShare && navigator.canShare({files:[new File(["x"],"t.json",{type:"application/json"})]}));
@@ -1332,7 +1403,7 @@ function openRole(){
   $("#whoIn").value=user.name||"";
   let pick=user.role||"";
   const host=$("#roleCards");
-  host.innerHTML=Object.entries(ROLES).map(([k,r])=>`<button type="button" class="rolec${k===pick?" on":""}" data-role="${k}"><b>${r.name}</b><span>${r.desc}</span></button>`).join("");
+  host.innerHTML=Object.entries(ROLES).filter(([k,r])=>!r.hidden||k===pick).map(([k,r])=>`<button type="button" class="rolec${k===pick?" on":""}" data-role="${k}"><b>${r.name}</b><span>${r.desc}</span></button>`).join("");
   host.onclick=e=>{ const b=e.target.closest("[data-role]"); if(!b) return; pick=b.dataset.role; host.querySelectorAll(".rolec").forEach(x=>x.classList.toggle("on",x===b)); };
   $("#roleOk").onclick=()=>{ const nm=$("#whoIn").value.trim(); if(!nm){ toast("Enter your name"); return; } if(!pick){ toast("Choose a role"); return; }
     const changed = user.role!==pick || user.name!==nm; user={name:nm, role:pick}; lsSet("faw.user", JSON.stringify(user));
@@ -1359,7 +1430,8 @@ function ptable(f,v,blank){
 function pfields(fl, d, blank){
   let h="", rows=[];
   const flush=()=>{ if(rows.length){ h+=`<table class="t">${rows.join("")}</table>`; rows=[]; } };
-  fl.forEach(f=>{ if(f.type==="table"){ flush(); h+=`<h3>${esc(f.label)}</h3>`+ptable(f,d[f.key],blank); }
+  fl.forEach(f=>{ if(f.type==="info"){ flush(); h+=`<div class="pinfo">${typeof f.html==="function"?f.html():f.html}</div>`; return; }
+    if(f.type==="table"){ flush(); h+=`<h3>${esc(f.label)}</h3>`+ptable(f,d[f.key],blank); }
     else rows.push(`<tr><td class="l">${esc(f.label)}${f.req?" *":""}</td><td>${pval(f,d[f.key],blank)}</td></tr>`); });
   flush(); return h;
 }
@@ -1371,6 +1443,7 @@ function buildReport(blank, photos){
   let b="";
   // cover
   b+=`<h1>PCBA Failure Analysis Record</h1><div class="meta">${blank?"Blank controlled form — complete one copy per PCBA or investigation":`Case ${esc(S.meta.caseId)} · file rev ${S.meta.rev} · ${n.done?"<b class='ok'>CLOSED</b>":"Status: <b>"+esc(n.text)+"</b>"}`}</div>`;
+  b+=`<div class="note" style="margin:0 0 4mm"><b>Scope — not covered by this record:</b> ${SCOPE_OUT.map(([a])=>esc(a)).join("; ")}. These are handled in the quality system (CAPA/8D, FRACAS, document control).</div>`;
   b+=pfields(STAGES.S1.fields.slice(0,12), s1, blank);
   b+=`<h3>Process status</h3><table class="t"><tr><th>Stage</th><th>Owner / approvers</th><th>Status</th><th>Signed / approved by</th><th>Date</th></tr>`;
   ORDER.forEach(id=>{ const s=STAGES[id], st=S.stages[id], ds=blank?"":dstat(id);
@@ -1452,7 +1525,9 @@ addEventListener("keydown", e=>{ if((e.ctrlKey||e.metaKey) && e.key.toLowerCase(
     if(el!==cur){ cur=el; const h=tipHTML(el.dataset.tip); if(!h){ tip.classList.remove("show"); return; } tip.innerHTML=h; tip.classList.add("show"); } place(e); });
   document.addEventListener("mousemove",e=>{ if(cur) place(e); });
   document.addEventListener("scroll",()=>{ tip.classList.remove("show"); cur=null; },true);
-  document.addEventListener("toggle",e=>{ if(e.target.classList&&e.target.classList.contains("why")) lsSet("faw.whyClosed", e.target.open?"":"1"); },true);
+  document.addEventListener("toggle",e=>{ if(!e.target.classList) return;
+    if(e.target.classList.contains("why")) lsSet("faw.whyClosed", e.target.open?"":"1");
+    if(e.target.classList.contains("scope")) lsSet("faw.scopeClosed", e.target.open?"":"1"); },true);
 })();
 /* older files used T for heat/soak; now D */
 function migrate(o){ try{ const s4=o.stages.S4.data, sb=o.stages.SB.data;
